@@ -65,6 +65,8 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 代码分为 `EditorApp`（AppKit 界面与着色）和 `EditorCore`（文件访问与编码）。界面字符串位于各 target 的 `Resources/en.lproj` 与 `Resources/zh-Hans.lproj` 目录。
 
+已验证的文件处理与编辑流程、禁网检查及验证边界见[原生验收记录](docs/native-validation.md)。
+
 ## 后续计划
 
 CSV 表格、JSON 树、Finder Quick Look、查找替换、行号及草稿恢复均在计划中，当前应用尚未包含这些功能。

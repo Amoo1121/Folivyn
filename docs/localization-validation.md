@@ -4,7 +4,10 @@ Date: 2026-10-26. Revalidated after adopting the Folivyn name, including the exe
 
 Folivyn uses English as its development language and includes Simplified Chinese. Menus, toolbar actions, status messages, dialogs, file errors, and plain-text highlighting labels use bundled translations. The interface follows macOS language preferences.
 
-## Verified
+## Historical results from 2026-10-26
+
+The following counts and measurements precede the final native-acceptance fixes.
+Current results are linked at the end; these figures remain unchanged for traceability.
 
 - 27 tests passed: 12 file-handling tests, 6 editing-session tests, 3 input-safety tests, and 6 localization tests.
 - The same 27 tests passed with network access denied.
@@ -31,8 +34,21 @@ sandbox-exec -p '(version 1) (allow default) (deny network*)' \
 codesign --verify --deep --strict "build/Folivyn.app"
 ```
 
-## Still to verify
+## Native acceptance update: 2026-10-26 to 2026-10-27
 
-Real window interaction, translated-label layout, input method behavior, performance measurements, and macOS 14 compatibility require further testing. Automated tests and resource resolution checks do not constitute visual UI acceptance. No Developer ID signature or notarization is included.
+This round of local functional acceptance is complete at code revision `3f93066`.
+All 28 tests passed normally and with network access denied. The rebuilt arm64
+Release app passes strict ad hoc signature verification; its 10 files total
+270,785 bytes (264.44 KiB), with 292 KiB disk allocation and a matching bundled
+MIT license.
 
-The [native acceptance record](native-validation.md) tracks the latest fixes, additional automated checks, and remaining desktop-control permission dependency.
+Visible checks include English interaction, Chinese menus/buttons/status in a
+network-denied process, real Pinyin input, Unicode byte preservation, and native
+file-safety flows. The [native acceptance record](native-validation.md) documents
+the observations and final highlighting-status regression check.
+
+Pinyin candidate-window positioning was not visible in app-bound captures.
+Automatic external-change notification on activation lacks independent UI
+evidence; manual Reload and save conflicts were verified. Precise startup/input
+P95, macOS 14 compatibility, Developer ID signing, and notarization remain
+unverified. These results do not establish completion of the full V1 roadmap.

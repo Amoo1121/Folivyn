@@ -1,20 +1,23 @@
 # Folivyn native acceptance validation
 
-Date: 2026-10-26. Code revision: `d4121a6`.
+Test dates: 2026-10-26 to 2026-10-27. Final code revision: `3f93066`.
+
+Environment: macOS 26.5.1 (25F80), arm64, Mac16,10, 16 GiB RAM;
+Xcode 26.6 (17F113).
 
 ## Status
 
-Native window acceptance is **in progress**. Desktop-control permissions have
-been restored, and visible application checks have begun on the unlocked Mac.
-The earlier three connection attempts produced no window-validation evidence;
-the observations below come from the subsequent successful desktop session.
-Automated preflight and release-build results remain as previously recorded;
-this documentation update does not represent another test or benchmark run.
+**This round of local functional acceptance is complete** for the current text
+editor scope. Visible application checks, fixture-byte comparisons, automated
+tests, and the final Release build are recorded below. This does not establish
+completion of the full V1 roadmap or the unverified items listed at the end.
+The earlier three failed desktop-control connection attempts produced no window
+evidence; native observations were made after permissions were restored.
 
-## Previously completed automated checks
+## Automated checks and final build
 
-- All 27 tests passed both normally and in a process tree with network access
-  denied: 12 file tests, 6 editor-session tests, 3 input-safety tests, and 6
+- All 28 tests passed both normally and in a process tree with network access
+  denied: 12 file tests, 6 editor-session tests, 4 input-safety tests, and 6
   localization tests.
 - Fixed an out-of-order disk-check result that could incorrectly clear a newer
   external-change warning. Each session now accepts only its latest check;
@@ -26,10 +29,14 @@ this documentation update does not represent another test or benchmark run.
   explicit undo groups and do not represent real keyboard input, system undo
   grouping, or a Pinyin candidate window.
 - The arm64 Release app builds and passes strict ad hoc signature verification.
-  Its 10 files total 270,433 bytes (264.09 KiB); disk allocation is 292 KiB.
+  Its 10 files total 270,785 bytes (264.44 KiB); disk allocation is 292 KiB.
   The packaged MIT license is byte-identical to the repository license.
 - Reproducible, synthetic fixtures are generated into a unique ignored run
   directory. No user documents are needed or modified by fixture creation.
+
+The earlier `d4121a6` preflight passed 27 tests and measured 270,433 bytes
+(264.09 KiB), with the same 292 KiB disk allocation. Those measurements precede
+the final highlighting-status fix and are retained here as historical results.
 
 ## Observed native checks
 
@@ -71,7 +78,51 @@ byte or hash comparisons of synthetic fixture files.
   `你好中文`; Backspace correction and undo/redo worked. Mixed Chinese, Emoji,
   and a decomposed accent saved to `ime.txt` with the expected UTF-8 bytes.
   Captures showed marked-text underlining and committed text. The system Pinyin
-  candidate window's position was not visually verified.
+  candidate window's position was not visually verified: it could not be
+  captured in the app-bound screenshots used for this session.
+- **Restricted Chinese-language session:** launched the Release app under
+  `sandbox-exec` with `(deny network*)` and `-AppleLanguages '(zh-Hans)'`.
+  Chinese menus, buttons, and status text displayed correctly with no obvious
+  clipping in the observed windows. This restricted process opened a UTF-16 LE
+  file, edited and saved it, saved a copy as `offline-copy.txt`, and reloaded an
+  external edit with `Cmd-R`.
+- **Encoding and rejected inputs:** in that restricted process, saving the three
+  supported BOM variants (UTF-8, UTF-16 LE, and UTF-16 BE) preserved the expected
+  BOM, CRLF, Emoji, and combining-character bytes. Opening invalid UTF-8 and a
+  file of 10 MiB plus one byte produced Chinese error messages. The existing
+  unsaved Untitled buffer remained intact.
+- **Selection and scrolling:** in a 300-line `scroll.py`, selected the unique
+  line 0200 and scrolled to the bottom. Switching to another tab and back retained
+  the selection and the scrollbar value of 1. After shortening the source,
+  Reload displayed its new first line and clamped the caret to the new end.
+- **Finder entry:** in a new Finder test window, Open With > Folivyn delivered
+  `sample.py` to the same network-restricted process and added a tab. The default
+  file association was not changed.
+- **Large-file boundaries:** the rebuilt app opened `many-lines.py` with 20,001
+  lines (140,007 bytes) and showed the Large text status. Replacing it with short
+  code cleared that status; `Cmd-Z` restored the long text and status, and
+  `Cmd-Shift-Z` restored the short text without the status. The exactly 10 MiB
+  `source-10485760.py` opened, allowed editing and undo, and showed plain-text
+  fallback. The earlier check rejected 10 MiB plus one byte.
+- **Earlier small-file memory observation:** `footprint -p 25625 --noCategories`
+  reported a current
+  footprint of 38 MB and a peak of 92 MB. This was one process sample with four
+  small-file tabs, after opening panels and a system preview. It is not a memory
+  benchmark or evidence of a performance target being met.
+- **Final large-file memory observation:** in a new process with two tabs
+  (`many-lines.py` and the 10 MiB file), after editing and undoing in the large
+  file, five `footprint` samples at one-second intervals each reported
+  `phys_footprint` of 94,946,288 bytes. The recorded peak was 174,556,144 bytes.
+  These samples describe that process and workload; they do not establish P95
+  timing or compliance with the roadmap's performance targets.
+
+## Issue fixed during acceptance
+
+The 20,000-line highlighting limit initially triggered plain-text fallback
+without the corresponding status message. Revision `3f93066` unifies the
+highlighting-limit decision and cached status, including undo/redo updates.
+The additional regression test and the rebuilt-window checks described above
+passed.
 
 ## Reproduce
 
@@ -86,17 +137,14 @@ sandbox-exec -p '(version 1) (allow default) (deny network*)' \
 codesign --verify --deep --strict "build/Folivyn.app"
 ```
 
-## Native checks remaining
+## Verification boundaries
 
-| Area | Required observations |
+| Area | Unverified scope |
 | --- | --- |
-| Selection and scrolling | Verify selection and scroll position across tab switches and Reload, including a shortened document. |
-| Encodings through the UI | Open, edit, and save the supported BOM and UTF-16 variants through the real window; compare bytes and displayed encoding. |
-| Large-file boundaries | Exercise the highlighting fallback and file-size rejection boundaries through the UI. |
-| Finder entry | Complete opening a fixture from Finder; an attempted interaction has not yet established this result. |
-| Input and localization | Visually verify Pinyin candidate positioning and Simplified Chinese UI labels/layout. |
-| Offline UI | Repeat the editing workflow with application networking denied; automated tests alone do not establish all window flows. |
-| Resource use | Measure visible/editable startup, input latency, and physical memory footprint with documented samples. |
+| Pinyin candidate window | Visually verify candidate positioning with an appropriate capture surface; app-bound screenshots have not established this result. |
+| Automatic activation warning | There is no reliable independent native observation that app activation alone displayed the external-change warning. Manual Reload and the save-conflict paths were verified; the stale-check logic has automated coverage. |
+| Performance | Precise visible/editable startup and input-latency measurements, including P95, were not performed. The footprint observations are not a performance acceptance result. |
+| Supported systems and distribution | macOS 14 compatibility, Intel execution, Developer ID signing, and notarization were not validated. Only the local arm64 build and its ad hoc signature were verified. |
 
-Minimum-system compatibility, Developer ID signing, notarization, CSV/JSON
-specialized views, and Finder Quick Look are outside this local prototype check.
+CSV/JSON specialized views, Finder Quick Look, and other remaining V1 features
+are outside this round of local functional acceptance.

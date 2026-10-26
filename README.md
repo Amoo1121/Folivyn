@@ -65,6 +65,8 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 The code is organized into `EditorApp` (AppKit interface and highlighting) and `EditorCore` (file access and encoding). Interface strings live in each target's `Resources/en.lproj` and `Resources/zh-Hans.lproj` directories.
 
+See the [native acceptance record](docs/native-validation.md) for tested file-handling and editing flows, offline checks, and verification limits.
+
 ## Roadmap
 
 CSV table and JSON tree views, Finder Quick Look, find and replace, line numbers, and draft recovery are planned. These features are not included in the current app.
