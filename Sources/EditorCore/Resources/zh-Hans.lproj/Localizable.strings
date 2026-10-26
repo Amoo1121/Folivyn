@@ -8,3 +8,4 @@
 "file.error.multipleHardLinks" = "此文件有多个硬链接。为避免改变链接关系，请另存为新文件。";
 "file.error.readFailed" = "无法读取文件：%@";
 "file.error.saveFailed" = "无法保存文件：%@";
+"preview.error.binaryContent" = "文件包含二进制控制字符，无法作为文本预览。";

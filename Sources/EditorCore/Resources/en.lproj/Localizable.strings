@@ -8,3 +8,4 @@
 "file.error.multipleHardLinks" = "This file has multiple hard links. Save to a new file to preserve the existing links.";
 "file.error.readFailed" = "Unable to read the file: %@";
 "file.error.saveFailed" = "Unable to save the file: %@";
+"preview.error.binaryContent" = "This file contains binary control characters and cannot be previewed as text.";
