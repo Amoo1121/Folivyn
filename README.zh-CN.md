@@ -11,6 +11,7 @@ Folivyn 是一个由个人开发、持续完善中的项目。欢迎通过 [GitH
 - **多文件标签。** 同时打开多个文件，每个标签独立保留撤销记录、选区和滚动位置。
 - **从磁盘重新加载。** 读取其他工具修改后的内容；有未保存的编辑时，可以取消、放弃修改，或另存副本后再重载。
 - **本地语法着色。** 为 Python、Java、JavaScript、TypeScript、JSON、JSONC 和 Shell 提供基础着色；其他文本格式照常打开。
+- **查找与替换。** 使用原生查找栏，在当前标签内进行字面文本搜索、切换匹配及替换。
 - **谨慎处理文件。** 保留支持的编码、BOM 与换行。保存前检查外部变更，遇到冲突时提示处理。
 - **完全离线。** 编辑与着色无需账号、网络或下载语言包。没有遥测或在线服务。
 - **原生、小巧。** 使用 Swift、AppKit 和 macOS 系统框架，无第三方包依赖。
@@ -38,6 +39,9 @@ open "build/Folivyn.app"
 | 另存为 | `⇧⌘S` |
 | 从磁盘重新加载 | `⌘R` |
 | 关闭标签 | `⌘W` |
+| 查找 / 替换 | `⌘F` / `⌥⌘F` |
+| 下一个 / 上一个匹配 | `⌘G` / `⇧⌘G` |
+| 查找选中的文本 | `⌘E` |
 | 上一个 / 下一个标签 | `⇧⌘[` / `⇧⌘]` |
 
 标签名称旁的圆点表示有未保存的修改。状态栏显示编码、语言、路径及检测到的外部变更。应用重新激活及保存前会检查磁盘文件，重新加载由你手动执行。
@@ -63,13 +67,13 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift test --scratch-path build/TestBuild
 ```
 
-代码分为 `EditorApp`（AppKit 界面与着色）和 `EditorCore`（文件访问与编码）。界面字符串位于各 target 的 `Resources/en.lproj` 与 `Resources/zh-Hans.lproj` 目录。
+代码分为 `EditorApp`（AppKit 界面）、`EditorUI`（共享着色与界面字符串）和 `EditorCore`（文件访问与文本模型）。本地化字符串位于各 target 的 `Resources/en.lproj` 与 `Resources/zh-Hans.lproj` 目录。
 
 已验证的文件处理与编辑流程、禁网检查及验证边界见[原生验收记录](docs/native-validation.md)。
 
 ## 后续计划
 
-CSV 表格、JSON 树、Finder Quick Look、查找替换、行号及草稿恢复均在计划中，当前应用尚未包含这些功能。
+CSV 表格、JSON 树、Finder Quick Look、行号及草稿恢复均在计划中，当前应用尚未包含这些功能。
 
 ## 参与贡献
 

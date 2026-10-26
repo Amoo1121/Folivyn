@@ -41,6 +41,8 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         textView.isRichText = false
         textView.importsGraphics = false
         textView.allowsUndo = true
+        textView.usesFindBar = true
+        textView.isIncrementalSearchingEnabled = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -129,7 +131,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
 }
 
 @MainActor
-final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTabViewDelegate {
+final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTabViewDelegate, NSUserInterfaceValidations {
     private var window: NSWindow!
     private let tabs = NSTabView()
     private let status = NSTextField(labelWithString: "")
@@ -202,6 +204,12 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         edit.addItem(withTitle: L10n.text(.copy), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         edit.addItem(withTitle: L10n.text(.paste), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: L10n.text(.selectAll), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(.separator())
+        addFindAction(.find, .showFindInterface, "f", to: edit)
+        addFindAction(.replace, .showReplaceInterface, "f", modifiers: [.command, .option], to: edit)
+        addFindAction(.findNext, .nextMatch, "g", to: edit)
+        addFindAction(.findPrevious, .previousMatch, "g", modifiers: [.command, .shift], to: edit)
+        addFindAction(.useSelectionForFind, .setSearchString, "e", to: edit)
         addMenu(L10n.text(.editMenu), menu: edit, to: bar)
 
         let view = NSMenu(title: L10n.text(.tabsMenu))
@@ -222,6 +230,28 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         let item = menu.addItem(withTitle: title, action: action, keyEquivalent: key)
         item.target = self
         item.keyEquivalentModifierMask = modifiers
+    }
+
+    private func addFindAction(_ title: L10n.Key, _ action: NSTextFinder.Action, _ key: String,
+                               modifiers: NSEvent.ModifierFlags = [.command], to menu: NSMenu) {
+        let item = menu.addItem(withTitle: L10n.text(title),
+                                action: #selector(performTextFinderAction(_:)), keyEquivalent: key)
+        item.target = self
+        item.tag = action.rawValue
+        item.keyEquivalentModifierMask = modifiers
+    }
+
+    @objc private func performTextFinderAction(_ sender: NSMenuItem) {
+        // The find bar's field can be first responder. Always search this tab's
+        // document, rather than a field editor or another session's text view.
+        current?.textView.performTextFinderAction(sender)
+    }
+
+    func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(performTextFinderAction(_:)) {
+            return current?.textView.validateUserInterfaceItem(item) ?? false
+        }
+        return true
     }
 
     private func createWindow() {

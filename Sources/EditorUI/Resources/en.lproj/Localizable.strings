@@ -18,6 +18,11 @@
 "action.copy" = "Copy";
 "action.paste" = "Paste";
 "action.select_all" = "Select All";
+"action.find" = "Find…";
+"action.replace" = "Find and Replace…";
+"action.find_next" = "Find Next";
+"action.find_previous" = "Find Previous";
+"action.use_selection_for_find" = "Use Selection for Find";
 "menu.tabs" = "Tabs";
 "action.previous_tab" = "Previous Tab";
 "action.next_tab" = "Next Tab";

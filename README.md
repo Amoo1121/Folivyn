@@ -11,6 +11,7 @@ Folivyn is a personal project that is actively being improved. Feedback, bug rep
 - **Multiple tabs.** Keep files open together, with separate undo histories, selections, and scroll positions.
 - **Reload from disk.** Pick up changes made by other tools. If you have unsaved edits, cancel, discard them, or save a copy before reloading.
 - **Local syntax highlighting.** Read Python, Java, JavaScript, TypeScript, JSON, JSONC, and shell scripts with basic syntax colors. Other text formats open normally.
+- **Find and replace.** Use the native find bar for literal search, next/previous matches, and replacement within the current tab.
 - **Careful file handling.** Preserve supported encodings, byte-order marks, and line endings. Check for external changes before saving and report conflicts.
 - **Fully offline.** Editing and highlighting work without an account, connection, or downloaded language packs. No telemetry or online services.
 - **Native and compact.** Built with Swift and AppKit, using macOS system frameworks and no third-party packages.
@@ -38,6 +39,9 @@ The script builds an arm64 release app and signs it locally. It selects `/Applic
 | Save as | `⇧⌘S` |
 | Reload from disk | `⌘R` |
 | Close tab | `⌘W` |
+| Find / replace | `⌘F` / `⌥⌘F` |
+| Next / previous match | `⌘G` / `⇧⌘G` |
+| Find selected text | `⌘E` |
 | Previous / next tab | `⇧⌘[` / `⇧⌘]` |
 
 A dot next to a tab's name indicates unsaved changes. The status bar shows its encoding, language, path, and any detected external changes. External files are checked when the app becomes active and before saving; reloading is manual.
@@ -63,13 +67,13 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift test --scratch-path build/TestBuild
 ```
 
-The code is organized into `EditorApp` (AppKit interface and highlighting) and `EditorCore` (file access and encoding). Interface strings live in each target's `Resources/en.lproj` and `Resources/zh-Hans.lproj` directories.
+The code is organized into `EditorApp` (AppKit interface), `EditorUI` (shared highlighting and interface strings), and `EditorCore` (file access and text models). Localized strings live in each target's `Resources/en.lproj` and `Resources/zh-Hans.lproj` directories.
 
 See the [native acceptance record](docs/native-validation.md) for tested file-handling and editing flows, offline checks, and verification limits.
 
 ## Roadmap
 
-CSV table and JSON tree views, Finder Quick Look, find and replace, line numbers, and draft recovery are planned. These features are not included in the current app.
+CSV table and JSON tree views, Finder Quick Look, line numbers, and draft recovery are planned. These features are not included in the current app.
 
 ## Contributing
 

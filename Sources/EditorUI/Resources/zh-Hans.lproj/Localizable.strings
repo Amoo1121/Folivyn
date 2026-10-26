@@ -18,6 +18,11 @@
 "action.copy" = "复制";
 "action.paste" = "粘贴";
 "action.select_all" = "全选";
+"action.find" = "查找…";
+"action.replace" = "查找与替换…";
+"action.find_next" = "查找下一个";
+"action.find_previous" = "查找上一个";
+"action.use_selection_for_find" = "使用所选内容查找";
 "menu.tabs" = "标签";
 "action.previous_tab" = "上一个标签";
 "action.next_tab" = "下一个标签";
