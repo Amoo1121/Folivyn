@@ -1,8 +1,8 @@
 # Folivyn 验证与实施计划
 
-英文/简体中文实现与 22 项测试结果见[本地化验证记录](localization-validation.md)。
+英文/简体中文实现与 27 项测试结果见[本地化验证记录](localization-validation.md)，本轮修复与真实窗口验收状态见[原生验收记录](native-validation.md)。
 
-日期：2026-10-26。本文的启动、输入延迟和内存数值均为**待验证的设计目标**。小型 P0 已实现并编译，22 项自动测试在常规和禁网环境均通过；Folivyn 国际化 arm64 Release 构建文件总大小 264.03 KiB、磁盘占用 292 KiB，低于 15 MiB 预算。真实窗口交互及性能尚待验收，详见[本地化验证记录](localization-validation.md)及[原型验证记录](prototype-validation.zh-CN.md)。下文区分本次原型验收和后续完整 V1 验收。
+日期：2026-10-26。本文的启动、输入延迟和内存数值均为**待验证的设计目标**。小型 P0 已实现并编译，27 项自动测试在常规和禁网环境均通过；Folivyn 国际化 arm64 Release 构建文件总大小 264.09 KiB、磁盘占用 292 KiB，低于 15 MiB 预算。真实窗口交互及性能尚待验收，详见[本地化验证记录](localization-validation.md)及[原型验证记录](prototype-validation.zh-CN.md)。下文区分本次原型验收和后续完整 V1 验收。
 
 本机基准信息已实际读取：Apple M4、16 GiB 内存、macOS 26.5.1、arm64；Xcode 26.6，Apple Swift 6.3.3。全局 developer directory 指向 Command Line Tools，需要时可以命令级指定 `/Applications/Xcode.app/Contents/Developer`，本轮未修改系统配置。
 

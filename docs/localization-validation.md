@@ -6,13 +6,13 @@ Folivyn uses English as its development language and includes Simplified Chinese
 
 ## Verified
 
-- 22 tests passed: 12 file-handling tests, 4 editing-session tests, and 6 localization tests.
-- The same 22 tests passed with network access denied.
+- 27 tests passed: 12 file-handling tests, 6 editing-session tests, 3 input-safety tests, and 6 localization tests.
+- The same 27 tests passed with network access denied.
 - English and Simplified Chinese resource keys and format placeholders match. Tests cover Unicode filenames, percent signs, file limits, and readable errors.
 - The arm64 release app builds and passes `codesign --verify --deep --strict` with a local ad hoc signature.
 - The packaged app contains both SwiftPM resource bundles under `Contents/Resources`. Resource loading checks that location before falling back to SwiftPM's development path.
 - A separate Foundation executable compiled from the actual localization and file-error sources was placed in a temporary app bundle with copies of the shipped resources. Its SwiftPM development-path fallback was replaced with a fatal error. In network-denied processes, `AppleLanguages` values of `en`, `zh-Hans`, and `fr` resolved to English, Simplified Chinese, and English respectively for both UI and file-error text. No desktop interaction was used for this check.
-- The Folivyn release app contains 10 files totaling 270,369 bytes (264.03 KiB). Filesystem allocation reported by `du -sh` is 292 KiB. The earlier 244 KiB result predates localization.
+- The Folivyn release app contains 10 files totaling 270,433 bytes (264.09 KiB). Filesystem allocation reported by `du -sh` is 292 KiB. The earlier 244 KiB result predates localization.
 
 The application now also bundles the MIT license. Its text was checked against the standard GitHub license template, the packaged copy matches the repository file, and the rebuilt app passes strict signature verification. No Swift source changed for this packaging update.
 
@@ -34,3 +34,5 @@ codesign --verify --deep --strict "build/Folivyn.app"
 ## Still to verify
 
 Real window interaction, translated-label layout, input method behavior, performance measurements, and macOS 14 compatibility require further testing. Automated tests and resource resolution checks do not constitute visual UI acceptance. No Developer ID signature or notarization is included.
+
+The [native acceptance record](native-validation.md) tracks the latest fixes, additional automated checks, and remaining desktop-control permission dependency.
