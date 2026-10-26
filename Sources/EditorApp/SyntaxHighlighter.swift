@@ -13,6 +13,8 @@ final class SyntaxHighlighter {
 
     private var pendingTask: Task<Void, Never>?
     private var revision: UInt64 = 0
+    /// Shared with the status bar so it describes the same limit decision as coloring.
+    private(set) var isLimited = false
 
     nonisolated static func languageName(for fileURL: URL?) -> String {
         SyntaxLanguage.forFile(fileURL)?.displayName ?? L10n.text(.plainText)
@@ -27,15 +29,17 @@ final class SyntaxHighlighter {
 
         // Do not interfere with a Chinese/Japanese/etc. input composition.
         guard !textView.hasMarkedText(), let storage = textView.textStorage else { return }
-        guard let language = SyntaxLanguage.forFile(fileURL),
-              storage.length <= Self.maximumUTF8Bytes else {
+        // UTF-8 needs at least as many bytes as UTF-16 code units. Reject an
+        // obviously oversized buffer without scanning or copying all its text.
+        guard storage.length <= Self.maximumUTF8Bytes else {
+            isLimited = true
             clearColors(in: textView)
             return
         }
 
         let snapshot = textView.string
-        guard snapshot.utf8.count <= Self.maximumUTF8Bytes,
-              Self.isWithinLineLimit(snapshot) else {
+        isLimited = Self.exceedsHighlightingLimits(snapshot)
+        guard !isLimited, let language = SyntaxLanguage.forFile(fileURL) else {
             clearColors(in: textView)
             return
         }
@@ -74,17 +78,21 @@ final class SyntaxHighlighter {
         pendingTask = nil
     }
 
-    private nonisolated static func isWithinLineLimit(_ text: String) -> Bool {
+    private nonisolated static func exceedsHighlightingLimits(_ text: String) -> Bool {
+        var bytes = 0
         var lines = 1
         var previousWasCR = false
-        for unit in text.utf16 {
-            if unit == 13 || (unit == 10 && !previousWasCR) {
+        // One bounded pass checks both budgets. CRLF counts as one line break.
+        for byte in text.utf8 {
+            bytes += 1
+            if bytes > maximumUTF8Bytes { return true }
+            if byte == 13 || (byte == 10 && !previousWasCR) {
                 lines += 1
-                if lines > maximumLineCount { return false }
+                if lines > maximumLineCount { return true }
             }
-            previousWasCR = unit == 13
+            previousWasCR = byte == 13
         }
-        return true
+        return false
     }
 
     private func clearColors(in textView: NSTextView) {

@@ -59,6 +59,10 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = true
         textView.delegate = self
+        for name in [Notification.Name.NSUndoManagerDidUndoChange, .NSUndoManagerDidRedoChange] {
+            NotificationCenter.default.addObserver(self, selector: #selector(historyDidChange(_:)),
+                                                   name: name, object: undoStack)
+        }
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
@@ -74,6 +78,11 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     func textDidChange(_ notification: Notification) {
         syntax.highlight(textView: textView, fileURL: file?.url)
         changed?()
+    }
+
+    @objc private func historyDidChange(_ notification: Notification) {
+        // Undo/redo can change NSTextView without calling its text-change delegate.
+        textDidChange(notification)
     }
 
     func undoManager(for view: NSTextView) -> UndoManager? { undoStack }
@@ -281,7 +290,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         window?.isDocumentEdited = session.dirty
         reloadButton?.isEnabled = session.file != nil
         var parts = [session.file?.encoding.displayName ?? "UTF-8", SyntaxHighlighter.languageName(for: session.file?.url)]
-        if session.textView.string.utf8.count > 200 * 1024 { parts.append(L10n.text(.largeText)) }
+        if session.syntax.isLimited { parts.append(L10n.text(.largeText)) }
         if session.dirty { parts.append(L10n.text(.unsaved)) }
         if session.diskChanged { parts.append(L10n.text(.diskChanged)) }
         parts.append(session.file?.url.path ?? L10n.text(.newDocument))

@@ -115,6 +115,39 @@ final class EditorInputTests: XCTestCase {
     }
 
     @MainActor
+    func testLineLimitReportsPlainTextModeEvenBelowByteLimit() async throws {
+        _ = NSApplication.shared
+        let original = "value = 42"
+        let (session, directory) = try makeSession(text: original, fileExtension: "py")
+        defer {
+            session.syntax.cancel()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        try await waitForSyntaxColor(in: session.textView,
+                                    at: (original as NSString).range(of: "42").location)
+        XCTAssertFalse(session.syntax.isLimited)
+        let manyLines = Array(repeating: "x", count: 20_001).joined(separator: "\n")
+        XCTAssertLessThan(manyLines.utf8.count, SyntaxHighlighter.maximumUTF8Bytes)
+
+        withInputGroup(session) {
+            session.textView.insertText(manyLines,
+                replacementRange: NSRange(location: 0, length: original.utf16.count))
+        }
+
+        XCTAssertTrue(session.syntax.isLimited, "The status bar must report a line-count fallback")
+        XCTAssertEqual(session.textView.textStorage?.attribute(.foregroundColor, at: 0,
+                                                               effectiveRange: nil) as? NSColor,
+                       NSColor.textColor)
+        XCTAssertEqual(session.textView.string, manyLines)
+        session.undoStack.undo()
+        XCTAssertEqual(session.textView.string, original)
+        XCTAssertFalse(session.syntax.isLimited, "Returning below the limit must clear the status")
+        session.undoStack.redo()
+        XCTAssertEqual(session.textView.string, manyLines)
+        XCTAssertTrue(session.syntax.isLimited, "Redo must restore the line-count fallback status")
+    }
+
+    @MainActor
     private func makeSession(text: String, fileExtension suffix: String = "txt") throws -> (EditorSession, URL) {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("EditorInputTests-\(UUID().uuidString)")
