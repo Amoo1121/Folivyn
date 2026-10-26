@@ -5,6 +5,60 @@ import XCTest
 
 final class EditorSessionTests: XCTestCase {
     @MainActor
+    func testDiskChecksIgnoreOlderResultsThatFinishAfterNewerChecks() async throws {
+        _ = NSApplication.shared
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("checked.txt")
+        let original = try DocumentFile.save("original", to: url, encoding: .utf8)
+        let session = EditorSession(file: original)
+        let olderCheck = try XCTUnwrap(session.beginDiskChangeCheck())
+        let olderResult = try DocumentFile.read(url)
+
+        try Data("external edit".utf8).write(to: url)
+        let newerCheck = try XCTUnwrap(session.beginDiskChangeCheck())
+        let newerResult = try DocumentFile.read(url)
+        var acceptedResults = 0
+        session.changed = { acceptedResults += 1 }
+
+        // Explicitly reverse completion order; no scheduling or timing is required.
+        session.finishDiskChangeCheck(newerCheck, result: newerResult)
+        XCTAssertTrue(session.diskChanged)
+        session.finishDiskChangeCheck(olderCheck, result: olderResult)
+        XCTAssertTrue(session.diskChanged)
+        XCTAssertEqual(acceptedResults, 1)
+        XCTAssertEqual(session.textView.string, "original")
+    }
+
+    @MainActor
+    func testSaveAndReloadInvalidatePendingChecksEvenWithUnchangedBaseline() async throws {
+        _ = NSApplication.shared
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("baseline.txt")
+        let original = try DocumentFile.save("original", to: url, encoding: .utf8)
+        let session = EditorSession(file: original)
+        let beforeSave = try XCTUnwrap(session.beginDiskChangeCheck())
+        let saved = try DocumentFile.save(original.text, to: url, encoding: original.encoding,
+                                         expectedSnapshot: original.diskSnapshot)
+        session.acceptSaved(saved)
+        session.finishDiskChangeCheck(beforeSave, result: nil)
+        XCTAssertFalse(session.diskChanged)
+
+        let beforeReload = try XCTUnwrap(session.beginDiskChangeCheck())
+        try Data("temporary external edit".utf8).write(to: url)
+        let staleResult = try DocumentFile.read(url)
+        try Data(original.text.utf8).write(to: url)
+        session.reload(try DocumentFile.read(url))
+        session.finishDiskChangeCheck(beforeReload, result: staleResult)
+        XCTAssertFalse(session.diskChanged)
+
+        let afterReload = try XCTUnwrap(session.beginDiskChangeCheck())
+        session.finishDiskChangeCheck(afterReload, result: nil)
+        XCTAssertTrue(session.diskChanged, "A current failed read must still report a disk change")
+    }
+
+    @MainActor
     func testTabsKeepIndependentUndoAndRedoHistories() async throws {
         _ = NSApplication.shared
         let first = EditorSession()

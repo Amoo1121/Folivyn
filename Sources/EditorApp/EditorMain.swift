@@ -14,6 +14,11 @@ enum EditorMain {
 
 @MainActor
 final class EditorSession: NSObject, NSTextViewDelegate {
+    struct DiskChangeCheck: Sendable {
+        let generation: UInt64
+        let file: LoadedTextFile
+    }
+
     let id = UUID()
     let textView = NSTextView(usingTextLayoutManager: true)
     let scrollView = NSScrollView()
@@ -24,6 +29,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     var baseline = ""
     var diskChanged = false
     var changed: (() -> Void)?
+    private var diskCheckGeneration: UInt64 = 0
     var dirty: Bool { !textView.string.utf16.elementsEqual(baseline.utf16) }
     var name: String { file?.url.lastPathComponent ?? L10n.text(.untitled) }
 
@@ -73,10 +79,27 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     func undoManager(for view: NSTextView) -> UndoManager? { undoStack }
 
     func acceptSaved(_ loaded: LoadedTextFile) {
+        // Invalidate checks started before a save or reload, even when the
+        // resulting bytes happen to match the previous baseline.
+        diskCheckGeneration &+= 1
         file = loaded
         baseline = loaded.text
         diskChanged = false
         syntax.highlight(textView: textView, fileURL: loaded.url)
+        changed?()
+    }
+
+    func beginDiskChangeCheck() -> DiskChangeCheck? {
+        guard let file else { return nil }
+        diskCheckGeneration &+= 1
+        return DiskChangeCheck(generation: diskCheckGeneration, file: file)
+    }
+
+    func finishDiskChangeCheck(_ check: DiskChangeCheck, result: LoadedTextFile?) {
+        guard check.generation == diskCheckGeneration,
+              file?.url == check.file.url,
+              file?.diskSnapshot == check.file.diskSnapshot else { return }
+        diskChanged = result?.diskSnapshot != check.file.diskSnapshot
         changed?()
     }
 
@@ -368,14 +391,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     private func checkDiskChanges() {
         for session in sessions {
-            guard let file = session.file else { continue }
-            DispatchQueue.global(qos: .utility).async { [weak self, weak session] in
-                let result = try? DocumentFile.read(file.url)
+            guard let check = session.beginDiskChangeCheck() else { continue }
+            DispatchQueue.global(qos: .utility).async { [weak session] in
+                let result = try? DocumentFile.read(check.file.url)
                 DispatchQueue.main.async {
-                    guard let self, let session, session.file?.diskSnapshot == file.diskSnapshot,
-                          session.file?.url == file.url else { return }
-                    session.diskChanged = result?.diskSnapshot != file.diskSnapshot
-                    self.refresh()
+                    session?.finishDiskChangeCheck(check, result: result)
                 }
             }
         }
