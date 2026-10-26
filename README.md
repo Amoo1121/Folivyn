@@ -72,3 +72,9 @@ CSV table and JSON tree views, Finder Quick Look, find and replace, line numbers
 ## Contributing
 
 Bug reports, focused pull requests, and translation improvements are welcome. Please include your macOS version and steps to reproduce an issue. For file-handling bugs, provide a small, non-sensitive sample and describe the expected encoding and line endings.
+
+See [Contributing](CONTRIBUTING.md) for code and asset provenance requirements.
+
+## License
+
+Folivyn is licensed under the [MIT License](LICENSE). Copyright (c) 2026 Amoo1121.

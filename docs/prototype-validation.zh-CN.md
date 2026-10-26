@@ -1,6 +1,6 @@
 # Folivyn：命名前的 P0 验证记录
 
-本文保留加入国际化及确定 Folivyn 品牌之前的初始测试结果。改名后的国际化构建已重新验证，22 项测试及当前 288 KiB 的磁盘占用见[本地化验证记录](localization-validation.md)。本文下方的测试数量、名称和体积仅代表初始构建。
+本文保留加入国际化及确定 Folivyn 品牌之前的初始测试结果。改名后的国际化构建已重新验证，22 项测试及当前 292 KiB 的磁盘占用见[本地化验证记录](localization-validation.md)。本文下方的测试数量、名称和体积仅代表初始构建。
 
 日期：2026-10-26。测试时项目使用临时名称 `macos-file-editor`；正式品牌现已确定为 **Folivyn**，仓库为 [Amoo1121/Folivyn](https://github.com/Amoo1121/Folivyn)。下文保留测试当时的应用、可执行文件和测试 bundle 名称，以便追溯；当前构建与测试命令见 [README](../README.md) 和[本地化验证记录](localization-validation.md)。
 

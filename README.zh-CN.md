@@ -72,3 +72,9 @@ CSV 表格、JSON 树、Finder Quick Look、查找替换、行号及草稿恢复
 ## 参与贡献
 
 欢迎提交问题、聚焦的 Pull Request 和翻译改进。报告问题时请附上 macOS 版本与复现步骤；文件处理问题请提供不含敏感信息的小型样例，并说明预期编码与换行格式。
+
+代码与素材的来源要求见[贡献指南](CONTRIBUTING.md)。
+
+## 许可证
+
+Folivyn 采用 [MIT 许可证](LICENSE)。Copyright (c) 2026 Amoo1121。
