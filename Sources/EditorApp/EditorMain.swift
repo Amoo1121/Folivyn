@@ -30,6 +30,8 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     var baseline = ""
     var diskChanged = false
     var changed: (() -> Void)?
+    var sourceChanged: (() -> Void)?
+    private(set) var revision: UInt64 = 0
     private var diskCheckGeneration: UInt64 = 0
     var dirty: Bool { !textView.string.utf16.elementsEqual(baseline.utf16) }
     var name: String { file?.url.lastPathComponent ?? L10n.text(.untitled) }
@@ -79,8 +81,44 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     }
 
     func textDidChange(_ notification: Notification) {
+        revision &+= 1
         syntax.highlight(textView: textView, fileURL: file?.url)
+        sourceChanged?()
         changed?()
+    }
+
+    /// Every derived view applies one local edit to this sole source buffer.
+    /// A matching revision alone is insufficient: compare exact UTF-16 units too.
+    @discardableResult
+    func replaceSource(in range: NSRange, expected: String, with replacement: String,
+                       revision expectedRevision: UInt64, actionName: String) -> Bool {
+        guard revision == expectedRevision, !textView.hasMarkedText(), textView.isEditable else { return false }
+        let source = textView.string as NSString
+        guard range.location >= 0, range.length >= 0, range.location <= source.length,
+              range.length <= source.length - range.location else { return false }
+        func isScalarBoundary(_ offset: Int) -> Bool {
+            guard offset > 0, offset < source.length else { return true }
+            return !((0xD800...0xDBFF).contains(source.character(at: offset - 1)) &&
+                     (0xDC00...0xDFFF).contains(source.character(at: offset)))
+        }
+        guard isScalarBoundary(range.location), isScalarBoundary(NSMaxRange(range)),
+              source.substring(with: range).utf16.elementsEqual(expected.utf16) else { return false }
+        if expected.utf16.elementsEqual(replacement.utf16) { return true }
+        textView.breakUndoCoalescing()
+        undoStack.beginUndoGrouping()
+        // AppKit registers its inverse edit during shouldChangeText, so the
+        // group must already be open before asking it to approve the mutation.
+        guard textView.shouldChangeText(in: range, replacementString: replacement) else {
+            undoStack.endUndoGrouping()
+            return false
+        }
+        textView.textStorage?.replaceCharacters(in: range, with: replacement)
+        textView.didChangeText()
+        textView.setSelectedRange(NSRange(location: range.location, length: replacement.utf16.count))
+        undoStack.endUndoGrouping()
+        undoStack.setActionName(actionName)
+        textView.breakUndoCoalescing()
+        return true
     }
 
     @objc private func historyDidChange(_ notification: Notification) {
@@ -120,6 +158,8 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         let origin = scrollView.contentView.bounds.origin
         textView.unmarkText()
         textView.string = loaded.text
+        revision &+= 1
+        sourceChanged?()
         undoStack.removeAllActions()
         let count = (loaded.text as NSString).length
         let location = min(selection.location, count)
