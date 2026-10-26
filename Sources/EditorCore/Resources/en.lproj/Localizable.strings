@@ -1,0 +1,10 @@
+"file.error.localOnly" = "Only local files can be opened.";
+"file.error.notFound" = "The file no longer exists: %@";
+"file.error.notRegularFile" = "Please choose a regular text file.";
+"file.error.tooLarge" = "Text files up to %ld MiB are supported.";
+"file.error.unsupportedEncoding" = "Supported encodings are UTF-8 and UTF-16 LE / BE with a BOM.";
+"file.error.invalidTextEncoding" = "The file is not valid UTF-8 or UTF-16 text with a BOM. No replacement characters were inserted.";
+"file.error.externalConflict" = "“%@” has been changed, deleted, or replaced on disk. Reload it or save your changes to another file.";
+"file.error.multipleHardLinks" = "This file has multiple hard links. Save to a new file to preserve the existing links.";
+"file.error.readFailed" = "Unable to read the file: %@";
+"file.error.saveFailed" = "Unable to save the file: %@";

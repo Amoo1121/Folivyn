@@ -1,0 +1,10 @@
+"file.error.localOnly" = "只能打开本地文件。";
+"file.error.notFound" = "文件已不存在：%@";
+"file.error.notRegularFile" = "请选择普通文本文件。";
+"file.error.tooLarge" = "支持最大 %ld MiB 的文本文件。";
+"file.error.unsupportedEncoding" = "支持 UTF-8，以及带 BOM 的 UTF-16 LE / BE 文件。";
+"file.error.invalidTextEncoding" = "文件不是有效的 UTF-8 或带 BOM 的 UTF-16 文本，未插入替换字符。";
+"file.error.externalConflict" = "磁盘上的“%@”已修改、删除或被其他文件替代。请重新加载，或将修改另存为新文件。";
+"file.error.multipleHardLinks" = "此文件有多个硬链接。为避免改变链接关系，请另存为新文件。";
+"file.error.readFailed" = "无法读取文件：%@";
+"file.error.saveFailed" = "无法保存文件：%@";

@@ -119,7 +119,7 @@ final class DocumentFileTests: XCTestCase {
         XCTAssertEqual(try DocumentFile.read(url).text, "replacement")
     }
 
-    func testReadAndSaveRejectOverPrototypeLimitWithoutChangingFile() throws {
+    func testReadAndSaveRejectOverSizeLimitWithoutChangingFile() throws {
         let url = directory.appendingPathComponent("large.log")
         try Data(repeating: 0x61, count: DocumentFile.maximumReadBytes + 1).write(to: url)
         XCTAssertThrowsError(try DocumentFile.read(url)) { error in

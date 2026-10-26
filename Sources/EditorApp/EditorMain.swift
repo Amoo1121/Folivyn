@@ -25,7 +25,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     var diskChanged = false
     var changed: (() -> Void)?
     var dirty: Bool { !textView.string.utf16.elementsEqual(baseline.utf16) }
-    var name: String { file?.url.lastPathComponent ?? "未命名" }
+    var name: String { file?.url.lastPathComponent ?? L10n.text(.untitled) }
 
     init(file: LoadedTextFile? = nil) {
         super.init()
@@ -144,37 +144,37 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     private func installMenu() {
         let bar = NSMenu()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "关于文件编辑器", action: #selector(showAbout), keyEquivalent: "").target = self
+        appMenu.addItem(withTitle: L10n.format(.about, L10n.appName), action: #selector(showAbout), keyEquivalent: "").target = self
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "退出文件编辑器", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        addMenu("文件编辑器", menu: appMenu, to: bar)
+        appMenu.addItem(withTitle: L10n.format(.quit, L10n.appName), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        addMenu(L10n.appName, menu: appMenu, to: bar)
 
-        let file = NSMenu(title: "文件")
-        addAction("新建", #selector(newDocument), "n", to: file)
-        addAction("打开…", #selector(openDocument), "o", to: file)
+        let file = NSMenu(title: L10n.text(.fileMenu))
+        addAction(L10n.text(.new), #selector(newDocument), "n", to: file)
+        addAction(L10n.text(.open), #selector(openDocument), "o", to: file)
         file.addItem(.separator())
-        addAction("保存", #selector(saveDocument), "s", to: file)
-        addAction("另存为…", #selector(saveDocumentAs), "s", modifiers: [.command, .shift], to: file)
-        addAction("从磁盘重新加载", #selector(reloadDocument), "r", to: file)
+        addAction(L10n.text(.save), #selector(saveDocument), "s", to: file)
+        addAction(L10n.text(.saveAs), #selector(saveDocumentAs), "s", modifiers: [.command, .shift], to: file)
+        addAction(L10n.text(.reloadFromDisk), #selector(reloadDocument), "r", to: file)
         file.addItem(.separator())
-        addAction("关闭标签", #selector(closeTab), "w", to: file)
-        addMenu("文件", menu: file, to: bar)
+        addAction(L10n.text(.closeTab), #selector(closeTab), "w", to: file)
+        addMenu(L10n.text(.fileMenu), menu: file, to: bar)
 
-        let edit = NSMenu(title: "编辑")
-        edit.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = edit.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "z")
+        let edit = NSMenu(title: L10n.text(.editMenu))
+        edit.addItem(withTitle: L10n.text(.undo), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: L10n.text(.redo), action: Selector(("redo:")), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
-        edit.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        edit.addItem(withTitle: "复制", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        edit.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        edit.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        addMenu("编辑", menu: edit, to: bar)
+        edit.addItem(withTitle: L10n.text(.cut), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: L10n.text(.copy), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: L10n.text(.paste), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: L10n.text(.selectAll), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        addMenu(L10n.text(.editMenu), menu: edit, to: bar)
 
-        let view = NSMenu(title: "标签")
-        addAction("上一个标签", #selector(previousTab), "[", modifiers: [.command, .shift], to: view)
-        addAction("下一个标签", #selector(nextTab), "]", modifiers: [.command, .shift], to: view)
-        addMenu("标签", menu: view, to: bar)
+        let view = NSMenu(title: L10n.text(.tabsMenu))
+        addAction(L10n.text(.previousTab), #selector(previousTab), "[", modifiers: [.command, .shift], to: view)
+        addAction(L10n.text(.nextTab), #selector(nextTab), "]", modifiers: [.command, .shift], to: view)
+        addMenu(L10n.text(.tabsMenu), menu: view, to: bar)
         NSApp.mainMenu = bar
     }
 
@@ -195,7 +195,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 980, height: 680),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
-        window.title = "文件编辑器"
+        window.title = L10n.appName
         window.minSize = NSSize(width: 600, height: 380)
         window.delegate = self
         window.isReleasedWhenClosed = false
@@ -204,8 +204,8 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         let toolbar = NSStackView()
         toolbar.orientation = .horizontal
         toolbar.spacing = 8
-        for (title, action) in [("打开…", #selector(openDocument)), ("新建", #selector(newDocument)),
-                                ("保存", #selector(saveDocument)), ("重新加载", #selector(reloadDocument))] {
+        for (title, action) in [(L10n.text(.open), #selector(openDocument)), (L10n.text(.new), #selector(newDocument)),
+                                (L10n.text(.save), #selector(saveDocument)), (L10n.text(.reload), #selector(reloadDocument))] {
             let button = NSButton(title: title, target: self, action: action)
             button.bezelStyle = .rounded
             toolbar.addArrangedSubview(button)
@@ -253,15 +253,15 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     private func refresh() {
         for session in sessions { session.item.label = session.name + (session.dirty ? " •" : "") }
         guard let session = current else { return }
-        window?.title = session.name + " — 文件编辑器"
+        window?.title = L10n.format(.windowTitle, session.name, L10n.appName)
         window?.representedURL = session.file?.url
         window?.isDocumentEdited = session.dirty
         reloadButton?.isEnabled = session.file != nil
         var parts = [session.file?.encoding.displayName ?? "UTF-8", SyntaxHighlighter.languageName(for: session.file?.url)]
-        if session.textView.string.utf8.count > 200 * 1024 { parts.append("大文本：基础纯文本模式") }
-        if session.dirty { parts.append("未保存") }
-        if session.diskChanged { parts.append("磁盘文件已变化，请重新加载或另存") }
-        parts.append(session.file?.url.path ?? "新文档")
+        if session.textView.string.utf8.count > 200 * 1024 { parts.append(L10n.text(.largeText)) }
+        if session.dirty { parts.append(L10n.text(.unsaved)) }
+        if session.diskChanged { parts.append(L10n.text(.diskChanged)) }
+        parts.append(session.file?.url.path ?? L10n.text(.newDocument))
         status.stringValue = parts.joined(separator: "  ·  ")
         status.toolTip = status.stringValue
     }
@@ -271,7 +271,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        panel.message = "选择文本或代码文件（原型支持不超过 10 MiB 的文件）"
+        panel.message = L10n.format(.openMessage, DocumentFile.maximumReadBytes / 1_024 / 1_024)
         if panel.runModal() == .OK { open(panel.urls) }
     }
 
@@ -300,7 +300,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         let panel = NSSavePanel()
         panel.nameFieldStringValue = session.file?.url.lastPathComponent ?? "Untitled.txt"
         panel.directoryURL = session.file?.url.deletingLastPathComponent()
-        panel.title = copy ? "保存未保存修改的副本" : "保存文件"
+        panel.title = copy ? L10n.text(.saveCopyTitle) : L10n.text(.saveTitle)
         return panel.runModal() == .OK ? panel.url : nil
     }
 
@@ -309,7 +309,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         guard let url = chosen ? pickSaveURL(for: session) : session.file?.url else { return false }
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath()
         if let other = sessions.first(where: { $0 !== session && $0.file?.url == canonical }) {
-            showMessage("该文件已在另一个标签中打开", "请切换到“\(other.name)”编辑，或选择其他保存位置。")
+            showMessage(L10n.text(.alreadyOpenTitle), L10n.format(.alreadyOpenMessage, other.name))
             return false
         }
         let sameFile = canonical == session.file?.url
@@ -324,10 +324,10 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             session.diskChanged = true
             refresh()
             let alert = NSAlert()
-            alert.messageText = "磁盘文件已被修改或删除"
-            alert.informativeText = "当前编辑内容仍然保留。请另存为其他文件，或取消后重新加载磁盘版本。"
-            alert.addButton(withTitle: "取消")
-            alert.addButton(withTitle: "另存为…")
+            alert.messageText = L10n.text(.conflictTitle)
+            alert.informativeText = L10n.text(.conflictMessage)
+            alert.addButton(withTitle: L10n.text(.cancel))
+            alert.addButton(withTitle: L10n.text(.saveAs))
             if alert.runModal() == .alertSecondButtonReturn { return save(session, saveAs: true) }
             return false
         } catch { showError(error); return false }
@@ -337,18 +337,18 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         guard let session = current, let source = session.file?.url else { return }
         if session.dirty {
             let alert = NSAlert()
-            alert.messageText = "重新加载“\(session.name)”？"
-            alert.informativeText = "此标签有未保存的修改。重新加载会用磁盘内容替换它，并清除旧的撤销记录。"
-            alert.addButton(withTitle: "取消")
-            alert.addButton(withTitle: "放弃修改并重新加载")
-            alert.addButton(withTitle: "另存副本后重新加载…")
+            alert.messageText = L10n.format(.reloadTitle, session.name)
+            alert.informativeText = L10n.text(.reloadMessage)
+            alert.addButton(withTitle: L10n.text(.cancel))
+            alert.addButton(withTitle: L10n.text(.discardAndReload))
+            alert.addButton(withTitle: L10n.text(.saveCopyAndReload))
             switch alert.runModal() {
             case .alertSecondButtonReturn: break
             case .alertThirdButtonReturn:
                 guard let copy = pickSaveURL(for: session, copy: true) else { return }
                 let canonical = copy.standardizedFileURL.resolvingSymlinksInPath()
                 guard canonical != source, !sessions.contains(where: { $0 !== session && $0.file?.url == canonical }) else {
-                    showMessage("请选择其他副本位置", "副本不能覆盖原文件或另一个已打开的文件。")
+                    showMessage(L10n.text(.copyLocationTitle), L10n.text(.copyLocationMessage))
                     return
                 }
                 do {
@@ -385,11 +385,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         guard session.dirty else { return true }
         tabs.selectTabViewItem(session.item)
         let alert = NSAlert()
-        alert.messageText = "保存对“\(session.name)”的修改？"
-        alert.informativeText = "未保存的内容将在关闭后丢失。"
-        alert.addButton(withTitle: "保存")
-        alert.addButton(withTitle: "取消")
-        alert.addButton(withTitle: "不保存")
+        alert.messageText = L10n.format(.closeTitle, session.name)
+        alert.informativeText = L10n.text(.closeMessage)
+        alert.addButton(withTitle: L10n.text(.save))
+        alert.addButton(withTitle: L10n.text(.cancel))
+        alert.addButton(withTitle: L10n.text(.dontSave))
         switch alert.runModal() {
         case .alertFirstButtonReturn: return save(session, saveAs: false)
         case .alertThirdButtonReturn: return true
@@ -417,14 +417,14 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         tabs.selectTabViewItem(sessions[(index + offset + sessions.count) % sessions.count].item)
     }
     @objc private func showAbout() {
-        showMessage("文件编辑器 · 离线原型", "多文件标签、打开保存、磁盘重新加载和基础语法着色。\n所有功能在本机运行，无网络依赖。\n当前原型单文件上限：10 MiB。")
+        showMessage(L10n.appName, L10n.format(.aboutMessage, DocumentFile.maximumReadBytes / 1_024 / 1_024))
     }
-    private func showError(_ error: Error) { showMessage("操作未完成", error.localizedDescription) }
+    private func showError(_ error: Error) { showMessage(L10n.text(.operationFailed), error.localizedDescription) }
     private func showMessage(_ title: String, _ message: String) {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: L10n.text(.ok))
         alert.runModal()
     }
 }

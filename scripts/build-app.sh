@@ -11,6 +11,9 @@ app_path="$project_root/build/File Editor.app"
 mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
 cp "$binary_dir/FileEditor" "$app_path/Contents/MacOS/FileEditor"
 cp Resources/Info.plist "$app_path/Contents/Info.plist"
+for component in EditorApp EditorCore; do
+    ditto "$binary_dir/MacOSFileEditor_$component.bundle" "$app_path/Contents/Resources/MacOSFileEditor_$component.bundle"
+done
 strip -x "$app_path/Contents/MacOS/FileEditor"
 codesign --force --sign - "$app_path"
 codesign --verify --strict "$app_path"

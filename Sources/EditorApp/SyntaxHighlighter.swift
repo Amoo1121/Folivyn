@@ -1,19 +1,21 @@
 import AppKit
 import Foundation
 
-/// A deliberately small, offline highlighter for the prototype.
+/// A small, offline syntax highlighter.
 /// It changes presentation attributes only; document text and undo are untouched.
 @MainActor
 final class SyntaxHighlighter {
     nonisolated static let maximumUTF8Bytes = 200 * 1024
     nonisolated static let maximumLineCount = 20_000
-    nonisolated static let highlightingLimitDescription = "超过 200 KiB 或 20,000 行时使用纯文本"
+    nonisolated static var highlightingLimitDescription: String {
+        L10n.format(.highlightingLimit, maximumUTF8Bytes / 1024, maximumLineCount)
+    }
 
     private var pendingTask: Task<Void, Never>?
     private var revision: UInt64 = 0
 
     nonisolated static func languageName(for fileURL: URL?) -> String {
-        SyntaxLanguage.forFile(fileURL)?.displayName ?? "纯文本"
+        SyntaxLanguage.forFile(fileURL)?.displayName ?? L10n.text(.plainText)
     }
 
     /// Safe to call for every text change and after opening/reloading a document.

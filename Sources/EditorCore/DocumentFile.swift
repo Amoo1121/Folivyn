@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// The prototype deliberately supports only encodings that can be detected safely.
+/// Supports encodings that can be detected safely without guessing.
 public enum TextFileEncoding: String, CaseIterable, Sendable {
     case utf8
     case utf8BOM
@@ -50,27 +50,32 @@ public enum DocumentFileError: Error, LocalizedError, Equatable {
     case saveFailed(URL, reason: String)
 
     public var errorDescription: String? {
+        message(in: CoreLocalization.bundle)
+    }
+
+    /// Keeps resource selection explicit so each shipped translation can be verified.
+    func message(in bundle: Bundle) -> String {
         switch self {
         case .invalidURL:
-            return "只能打开本地文件。"
+            return CoreLocalization.string("file.error.localOnly", bundle: bundle)
         case .fileNotFound(let url):
-            return "文件已不存在：\(url.lastPathComponent)"
+            return CoreLocalization.string("file.error.notFound", bundle: bundle, arguments: [url.lastPathComponent])
         case .notRegularFile:
-            return "请选择普通文本文件。"
+            return CoreLocalization.string("file.error.notRegularFile", bundle: bundle)
         case .tooLarge(_, let limit):
-            return "原型目前支持最大 \(limit / 1_024 / 1_024) MiB 的文本文件。"
+            return CoreLocalization.string("file.error.tooLarge", bundle: bundle, arguments: [limit / 1_024 / 1_024])
         case .unsupportedEncoding:
-            return "原型仅支持 UTF-8，以及带 BOM 的 UTF-16 LE / BE 文件。"
+            return CoreLocalization.string("file.error.unsupportedEncoding", bundle: bundle)
         case .invalidTextEncoding:
-            return "文件不是有效的 UTF-8 或带 BOM 的 UTF-16 文本，未进行替换解码。"
+            return CoreLocalization.string("file.error.invalidTextEncoding", bundle: bundle)
         case .externalConflict(let url):
-            return "磁盘上的“\(url.lastPathComponent)”已修改、删除或被其他文件替代。请重新加载，或确认后覆盖。"
+            return CoreLocalization.string("file.error.externalConflict", bundle: bundle, arguments: [url.lastPathComponent])
         case .multipleHardLinks:
-            return "此文件有多个硬链接。为避免改变链接关系，请另存为新文件。"
+            return CoreLocalization.string("file.error.multipleHardLinks", bundle: bundle)
         case .readFailed(_, let reason):
-            return "无法读取文件：\(reason)"
+            return CoreLocalization.string("file.error.readFailed", bundle: bundle, arguments: [reason])
         case .saveFailed(_, let reason):
-            return "无法保存文件：\(reason)"
+            return CoreLocalization.string("file.error.saveFailed", bundle: bundle, arguments: [reason])
         }
     }
 }
