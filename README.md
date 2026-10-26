@@ -4,6 +4,8 @@ Folivyn is a lightweight, native text and code editor for macOS. Open a file, ma
 
 **English** · [简体中文](README.zh-CN.md)
 
+Folivyn is a personal project that is actively being improved. Feedback, bug reports, and ideas are welcome in [GitHub Issues](https://github.com/Amoo1121/Folivyn/issues).
+
 ## Features
 
 - **Multiple tabs.** Keep files open together, with separate undo histories, selections, and scroll positions.

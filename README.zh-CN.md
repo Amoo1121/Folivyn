@@ -4,6 +4,8 @@ Folivyn 是一款轻量、原生的 macOS 文本与代码编辑器。打开文�
 
 [English](README.md) · **简体中文**
 
+Folivyn 是一个由个人开发、持续完善中的项目。欢迎通过 [GitHub Issues](https://github.com/Amoo1121/Folivyn/issues) 反馈问题、提出建议，帮助它变得更好用。
+
 ## 功能
 
 - **多文件标签。** 同时打开多个文件，每个标签独立保留撤销记录、选区和滚动位置。
