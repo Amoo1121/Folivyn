@@ -2,10 +2,10 @@ import Foundation
 
 /// Uses the app's preferred system language, with English as the development fallback.
 enum L10n {
-    static let appName = "File Editor"
+    static let appName = "Folivyn"
     static let resourceBundle: Bundle = {
         // Packaged apps keep SwiftPM resources in the standard macOS resource directory.
-        if let url = Bundle.main.url(forResource: "MacOSFileEditor_EditorApp", withExtension: "bundle"),
+        if let url = Bundle.main.url(forResource: "Folivyn_EditorApp", withExtension: "bundle"),
            let bundle = Bundle(url: url) {
             return bundle
         }

@@ -1,6 +1,6 @@
-# File Editor
+# Folivyn
 
-A lightweight, native text and code editor for macOS. Open a file, make your changes, and get on with your day.
+Folivyn is a lightweight, native text and code editor for macOS. Open a file, make your changes, and get on with your day.
 
 **English** · [简体中文](README.zh-CN.md)
 
@@ -18,10 +18,10 @@ A lightweight, native text and code editor for macOS. Open a file, make your cha
 Requires an Apple Silicon Mac running macOS 14 or later and Xcode with Swift 5.9 or newer. Compatibility testing on macOS 14 is still pending.
 
 ```sh
-git clone https://github.com/Amoo1121/macos-file-editor.git
-cd macos-file-editor
+git clone https://github.com/Amoo1121/Folivyn.git
+cd Folivyn
 ./scripts/build-app.sh
-open "build/File Editor.app"
+open "build/Folivyn.app"
 ```
 
 The script builds an arm64 release app and signs it locally. It selects `/Applications/Xcode.app` when available; set `DEVELOPER_DIR` to use another Xcode installation. The local build is not notarized by Apple.

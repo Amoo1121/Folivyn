@@ -2,7 +2,7 @@ import Foundation
 
 enum CoreLocalization {
     static let bundle: Bundle = {
-        if let url = Bundle.main.url(forResource: "MacOSFileEditor_EditorCore", withExtension: "bundle"),
+        if let url = Bundle.main.url(forResource: "Folivyn_EditorCore", withExtension: "bundle"),
            let bundle = Bundle(url: url) {
             return bundle
         }

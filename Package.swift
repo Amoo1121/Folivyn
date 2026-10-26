@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "MacOSFileEditor",
+    name: "Folivyn",
     defaultLocalization: "en",
     platforms: [.macOS(.v14)],
-    products: [.executable(name: "FileEditor", targets: ["EditorApp"])],
+    products: [.executable(name: "Folivyn", targets: ["EditorApp"])],
     dependencies: [],
     targets: [
         .target(name: "EditorCore", resources: [.process("Resources")]),

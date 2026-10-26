@@ -1,8 +1,8 @@
-# P0 原型验证记录
+# Folivyn：命名前的 P0 验证记录
 
-本文记录加入国际化之前的初始测试结果。当前版本的 22 项测试及 288 KiB 体积见[本地化验证记录](localization-validation.md)。
+本文保留加入国际化及确定 Folivyn 品牌之前的初始测试结果。改名后的国际化构建已重新验证，22 项测试及当前 288 KiB 的磁盘占用见[本地化验证记录](localization-validation.md)。本文下方的测试数量、名称和体积仅代表初始构建。
 
-日期：2026-10-26。暂定项目名为 `macos-file-editor`，未确定正式品牌。
+日期：2026-10-26。测试时项目使用临时名称 `macos-file-editor`；正式品牌现已确定为 **Folivyn**，仓库为 [Amoo1121/Folivyn](https://github.com/Amoo1121/Folivyn)。下文保留测试当时的应用、可执行文件和测试 bundle 名称，以便追溯；当前构建与测试命令见 [README](../README.md) 和[本地化验证记录](localization-validation.md)。
 
 原型已实现并编译，通过文件核心与 AppKit 会话自动测试。本轮测试环境未提供可交互桌面，因此没有完成真实窗口交互验收；自动测试通过不能替代界面、输入法或性能验证。
 
@@ -20,9 +20,9 @@
 | 可执行文件 | `FileEditor` 为 arm64，238,544 bytes |
 | 动态链接 | `otool -L` 中均为 `/System/Library/Frameworks` 或 `/usr/lib` 系统库；无内嵌 Swift 运行时或第三方 framework |
 
-上述体积仅对应当前小型 P0，不外推到含结构视图、更多语法和扩展的完整 V1，也不包含开发工具、构建缓存或测试产物。
+上述体积仅对应当时的小型 P0，不外推到含结构视图、更多语法和扩展的完整 V1，也不包含开发工具、构建缓存或测试产物。
 
-当前语法着色是本地有界扫描器，覆盖 Python、Java、JavaScript/TypeScript、JSON/JSONC、Shell。文件读写上限为 10 MiB；着色上限为 200 KiB 或 20,000 行，超出后保留纯文本编辑。CSV/JSON 结构视图和 Quick Look 尚未实现。
+本轮测试的语法着色是本地有界扫描器，覆盖 Python、Java、JavaScript/TypeScript、JSON/JSONC、Shell。文件读写上限为 10 MiB；着色上限为 200 KiB 或 20,000 行，超出后保留纯文本编辑。CSV/JSON 结构视图和 Quick Look 尚未实现。
 
 ## 已执行的自动验证
 

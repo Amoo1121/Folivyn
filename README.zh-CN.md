@@ -1,6 +1,6 @@
-# File Editor
+# Folivyn
 
-轻量、原生的 macOS 文本与代码编辑器。打开文件，完成修改，继续手头的工作。
+Folivyn 是一款轻量、原生的 macOS 文本与代码编辑器。打开文件，完成修改，继续手头的工作。
 
 [English](README.md) · **简体中文**
 
@@ -18,10 +18,10 @@
 需要运行 macOS 14 或更高版本的 Apple Silicon Mac，以及包含 Swift 5.9 或更高版本的 Xcode。macOS 14 实机兼容性验证尚待完成。
 
 ```sh
-git clone https://github.com/Amoo1121/macos-file-editor.git
-cd macos-file-editor
+git clone https://github.com/Amoo1121/Folivyn.git
+cd Folivyn
 ./scripts/build-app.sh
-open "build/File Editor.app"
+open "build/Folivyn.app"
 ```
 
 脚本构建 arm64 Release 应用并进行本地签名。存在 `/Applications/Xcode.app` 时会自动使用；也可通过 `DEVELOPER_DIR` 指定其他 Xcode 安装位置。本地构建没有经过 Apple 公证。

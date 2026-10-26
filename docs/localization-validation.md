@@ -1,8 +1,8 @@
-# English and Simplified Chinese validation
+# Folivyn: English and Simplified Chinese validation
 
-Date: 2026-10-26.
+Date: 2026-10-26. Revalidated after adopting the Folivyn name, including the executable, app identifier, and packaged resource bundles.
 
-The app uses English as its development language and includes Simplified Chinese. Menus, toolbar actions, status messages, dialogs, file errors, and plain-text highlighting labels use bundled translations. The interface follows macOS language preferences.
+Folivyn uses English as its development language and includes Simplified Chinese. Menus, toolbar actions, status messages, dialogs, file errors, and plain-text highlighting labels use bundled translations. The interface follows macOS language preferences.
 
 ## Verified
 
@@ -12,7 +12,7 @@ The app uses English as its development language and includes Simplified Chinese
 - The arm64 release app builds and passes `codesign --verify --deep --strict` with a local ad hoc signature.
 - The packaged app contains both SwiftPM resource bundles under `Contents/Resources`. Resource loading checks that location before falling back to SwiftPM's development path.
 - A separate Foundation executable compiled from the actual localization and file-error sources was placed in a temporary app bundle with copies of the shipped resources. Its SwiftPM development-path fallback was replaced with a fatal error. In network-denied processes, `AppleLanguages` values of `en`, `zh-Hans`, and `fr` resolved to English, Simplified Chinese, and English respectively for both UI and file-error text. No desktop interaction was used for this check.
-- The release app contains 9 files totaling 269,214 bytes (262.90 KiB). Filesystem allocation reported by `du -sh` is 288 KiB. The earlier 244 KiB result predates localization.
+- The Folivyn release app contains 9 files totaling 269,084 bytes (262.78 KiB). Filesystem allocation reported by `du -sh` is 288 KiB. The earlier 244 KiB result predates localization.
 
 ## Reproduce automated tests
 
@@ -23,10 +23,10 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 sandbox-exec -p '(version 1) (allow default) (deny network*)' \
   env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   xcrun xctest \
-  build/TestBuild/arm64-apple-macosx/debug/MacOSFileEditorPackageTests.xctest
+  build/TestBuild/arm64-apple-macosx/debug/FolivynPackageTests.xctest
 
 ./scripts/build-app.sh
-codesign --verify --deep --strict "build/File Editor.app"
+codesign --verify --deep --strict "build/Folivyn.app"
 ```
 
 ## Still to verify
