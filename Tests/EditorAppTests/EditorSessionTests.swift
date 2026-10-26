@@ -1,0 +1,133 @@
+import AppKit
+import EditorCore
+import XCTest
+@testable import EditorApp
+
+final class EditorSessionTests: XCTestCase {
+    @MainActor
+    func testTabsKeepIndependentUndoAndRedoHistories() async throws {
+        _ = NSApplication.shared
+        let first = EditorSession()
+        let second = EditorSession()
+        let firstUndo = try XCTUnwrap(first.textView.undoManager)
+        let secondUndo = try XCTUnwrap(second.textView.undoManager)
+        XCTAssertFalse(firstUndo === secondUndo)
+
+        try insert("first tab", into: first)
+        try insert("second tab", into: second)
+        firstUndo.undo()
+
+        XCTAssertEqual(first.textView.string, "")
+        XCTAssertFalse(first.dirty)
+        XCTAssertEqual(second.textView.string, "second tab")
+        XCTAssertTrue(second.dirty)
+        XCTAssertTrue(secondUndo.canUndo)
+
+        firstUndo.redo()
+        XCTAssertEqual(first.textView.string, "first tab")
+        XCTAssertTrue(first.dirty)
+        secondUndo.undo()
+        XCTAssertEqual(second.textView.string, "")
+        XCTAssertEqual(first.textView.string, "first tab")
+    }
+
+    @MainActor
+    func testReloadAppliesDiskContentsAndClearsOnlyItsOwnUndoHistory() async throws {
+        _ = NSApplication.shared
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("reload.txt")
+        let original = try DocumentFile.save("original text", to: url, encoding: .utf8)
+        let first = EditorSession(file: original)
+        let second = EditorSession()
+        try insert(" with local changes", into: first)
+        try insert("keep this undo", into: second)
+        first.diskChanged = true
+        first.textView.setSelectedRange(NSRange(location: first.textView.string.utf16.count, length: 0))
+
+        try Data("disk".utf8).write(to: url)
+        let diskVersion = try DocumentFile.read(url)
+        first.reload(diskVersion)
+
+        XCTAssertEqual(first.textView.string, "disk")
+        XCTAssertEqual(first.baseline, "disk")
+        XCTAssertEqual(first.file?.diskSnapshot, diskVersion.diskSnapshot)
+        XCTAssertFalse(first.dirty)
+        XCTAssertFalse(first.diskChanged)
+        XCTAssertEqual(first.textView.selectedRange(), NSRange(location: 4, length: 0))
+        XCTAssertFalse(first.undoStack.canUndo)
+        XCTAssertFalse(first.undoStack.canRedo)
+        XCTAssertTrue(second.undoStack.canUndo)
+        second.undoStack.undo()
+        XCTAssertEqual(second.textView.string, "")
+        XCTAssertEqual(first.textView.string, "disk")
+    }
+
+    @MainActor
+    func testCanonicallyEquivalentUnicodeEditIsStillDirty() async throws {
+        _ = NSApplication.shared
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let composed = "caf\u{E9}"
+        let decomposed = "cafe\u{301}"
+        let url = directory.appendingPathComponent("unicode.txt")
+        let loaded = try DocumentFile.save(composed, to: url, encoding: .utf8)
+        let session = EditorSession(file: loaded)
+        XCTAssertFalse(session.dirty)
+
+        try insert(decomposed, into: session,
+                   replacing: NSRange(location: 0, length: composed.utf16.count))
+
+        // Swift String equality intentionally treats these spellings as equal.
+        // A file editor still has to protect their different on-disk bytes.
+        XCTAssertEqual(session.textView.string, composed)
+        XCTAssertNotEqual(Array(session.textView.string.utf16), Array(composed.utf16))
+        XCTAssertTrue(session.dirty)
+        session.undoStack.undo()
+        XCTAssertEqual(Array(session.textView.string.utf16), Array(composed.utf16))
+        XCTAssertFalse(session.dirty)
+    }
+
+    @MainActor
+    func testAcceptingSaveAsChangesBaselineAndKeepsUndoAndOriginalFile() async throws {
+        _ = NSApplication.shared
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let originalURL = directory.appendingPathComponent("original.txt")
+        let destinationURL = directory.appendingPathComponent("copy.txt")
+        let original = try DocumentFile.save("original", to: originalURL, encoding: .utf8)
+        let session = EditorSession(file: original)
+        try insert(" edited", into: session)
+        let edited = session.textView.string
+        let saved = try DocumentFile.save(edited, to: destinationURL, encoding: .utf8)
+
+        session.acceptSaved(saved)
+
+        XCTAssertEqual(session.file?.url, destinationURL.resolvingSymlinksInPath())
+        XCTAssertEqual(session.baseline, edited)
+        XCTAssertFalse(session.dirty)
+        XCTAssertTrue(session.undoStack.canUndo)
+        session.undoStack.undo()
+        XCTAssertEqual(session.textView.string, "original")
+        XCTAssertTrue(session.dirty)
+        XCTAssertEqual(try DocumentFile.read(originalURL).text, "original")
+        XCTAssertEqual(try DocumentFile.read(destinationURL).text, edited)
+    }
+
+    @MainActor
+    private func insert(_ text: String, into session: EditorSession,
+                        replacing range: NSRange? = nil) throws {
+        let undo = try XCTUnwrap(session.textView.undoManager)
+        undo.beginUndoGrouping()
+        defer { undo.endUndoGrouping() }
+        session.textView.insertText(text, replacementRange:
+            range ?? NSRange(location: session.textView.string.utf16.count, length: 0))
+    }
+
+    private func makeTemporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EditorSessionTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+}
