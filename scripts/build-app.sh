@@ -12,7 +12,7 @@ mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
 cp "$binary_dir/Folivyn" "$app_path/Contents/MacOS/Folivyn"
 cp Resources/Info.plist "$app_path/Contents/Info.plist"
 cp LICENSE "$app_path/Contents/Resources/LICENSE"
-for component in EditorApp EditorCore; do
+for component in EditorUI EditorCore; do
     ditto "$binary_dir/Folivyn_$component.bundle" "$app_path/Contents/Resources/Folivyn_$component.bundle"
 done
 strip -x "$app_path/Contents/MacOS/Folivyn"

@@ -4,25 +4,26 @@ import Foundation
 /// A small, offline syntax highlighter.
 /// It changes presentation attributes only; document text and undo are untouched.
 @MainActor
-final class SyntaxHighlighter {
-    nonisolated static let maximumUTF8Bytes = 200 * 1024
-    nonisolated static let maximumLineCount = 20_000
-    nonisolated static var highlightingLimitDescription: String {
+public final class SyntaxHighlighter {
+    public init() {}
+    public nonisolated static let maximumUTF8Bytes = 200 * 1024
+    public nonisolated static let maximumLineCount = 20_000
+    public nonisolated static var highlightingLimitDescription: String {
         L10n.format(.highlightingLimit, maximumUTF8Bytes / 1024, maximumLineCount)
     }
 
     private var pendingTask: Task<Void, Never>?
     private var revision: UInt64 = 0
     /// Shared with the status bar so it describes the same limit decision as coloring.
-    private(set) var isLimited = false
+    public private(set) var isLimited = false
 
-    nonisolated static func languageName(for fileURL: URL?) -> String {
+    public nonisolated static func languageName(for fileURL: URL?) -> String {
         SyntaxLanguage.forFile(fileURL)?.displayName ?? L10n.text(.plainText)
     }
 
     /// Safe to call for every text change and after opening/reloading a document.
     /// A short debounce keeps typing responsive; stale parses are never applied.
-    func highlight(textView: NSTextView, fileURL: URL?) {
+    public func highlight(textView: NSTextView, fileURL: URL?) {
         revision &+= 1
         pendingTask?.cancel()
         pendingTask = nil
@@ -72,7 +73,7 @@ final class SyntaxHighlighter {
         }
     }
 
-    func cancel() {
+    public func cancel() {
         revision &+= 1
         pendingTask?.cancel()
         pendingTask = nil

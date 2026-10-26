@@ -1,6 +1,7 @@
 import AppKit
 import EditorCore
 import XCTest
+import EditorUI
 @testable import EditorApp
 
 /// Exercises the text-input client directly; this does not test an input method's

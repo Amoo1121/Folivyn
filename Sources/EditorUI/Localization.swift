@@ -1,18 +1,18 @@
 import Foundation
 
 /// Uses the app's preferred system language, with English as the development fallback.
-enum L10n {
-    static let appName = "Folivyn"
-    static let resourceBundle: Bundle = {
+public enum L10n {
+    public static let appName = "Folivyn"
+    public static let resourceBundle: Bundle = {
         // Packaged apps keep SwiftPM resources in the standard macOS resource directory.
-        if let url = Bundle.main.url(forResource: "Folivyn_EditorApp", withExtension: "bundle"),
+        if let url = Bundle.main.url(forResource: "Folivyn_EditorUI", withExtension: "bundle"),
            let bundle = Bundle(url: url) {
             return bundle
         }
         return Bundle.module
     }()
 
-    enum Key: String, CaseIterable {
+    public enum Key: String, CaseIterable {
         case untitled = "document.untitled"
         case windowTitle = "window.title"
         case about = "menu.about"
@@ -63,11 +63,11 @@ enum L10n {
         case highlightingLimit = "syntax.limit"
     }
 
-    static func text(_ key: Key, language: String? = nil) -> String {
+    public static func text(_ key: Key, language: String? = nil) -> String {
         bundle(for: language).localizedString(forKey: key.rawValue, value: nil, table: nil)
     }
 
-    static func format(_ key: Key, _ arguments: CVarArg..., language: String? = nil) -> String {
+    public static func format(_ key: Key, _ arguments: CVarArg..., language: String? = nil) -> String {
         let locale = language.map { Locale(identifier: $0) } ?? Locale.current
         return String(format: text(key, language: language), locale: locale, arguments: arguments)
     }

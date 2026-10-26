@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import EditorUI
 @testable import EditorApp
 
 final class LocalizationTests: XCTestCase {

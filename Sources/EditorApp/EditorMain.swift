@@ -1,5 +1,6 @@
 import AppKit
 import EditorCore
+import EditorUI
 
 @main
 enum EditorMain {
