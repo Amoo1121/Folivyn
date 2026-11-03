@@ -17,13 +17,15 @@ public final class SyntaxHighlighter {
     /// Shared with the status bar so it describes the same limit decision as coloring.
     public private(set) var isLimited = false
 
-    public nonisolated static func languageName(for fileURL: URL?) -> String {
-        SyntaxLanguage.forFile(fileURL)?.displayName ?? L10n.text(.plainText)
+    public nonisolated static func languageName(for fileURL: URL?, override languageOverride: SyntaxLanguage? = nil) -> String {
+        (languageOverride ?? SyntaxLanguage.forFile(fileURL) ?? .plainText).displayName
     }
 
     /// Safe to call for every text change and after opening/reloading a document.
     /// A short debounce keeps typing responsive; stale parses are never applied.
-    public func highlight(textView: NSTextView, fileURL: URL?) {
+    /// A nil override retains filename detection. Explicit plainText disables
+    /// colors without changing the document, filename or scanner budgets.
+    public func highlight(textView: NSTextView, fileURL: URL?, override languageOverride: SyntaxLanguage? = nil) {
         revision &+= 1
         pendingTask?.cancel()
         pendingTask = nil
@@ -40,7 +42,8 @@ public final class SyntaxHighlighter {
 
         let snapshot = textView.string
         isLimited = Self.exceedsHighlightingLimits(snapshot)
-        guard !isLimited, let language = SyntaxLanguage.forFile(fileURL) else {
+        let language = languageOverride ?? SyntaxLanguage.forFile(fileURL) ?? .plainText
+        guard !isLimited, language != .plainText else {
             clearColors(in: textView)
             return
         }
@@ -119,10 +122,12 @@ public final class SyntaxHighlighter {
     }
 }
 
-private enum SyntaxLanguage: Sendable {
-    case json, jsonWithComments, python, java, javascript, typescript, shell
+/// The bundled basic scanners. Raw values are stable per-document choices;
+/// automatic detection is represented by a nil override, not another scanner.
+public enum SyntaxLanguage: String, CaseIterable, Sendable {
+    case plainText, json, jsonWithComments, python, java, javascript, typescript, shell
 
-    static func forFile(_ url: URL?) -> Self? {
+    public static func forFile(_ url: URL?) -> Self? {
         guard let url else { return nil }
         switch url.pathExtension.lowercased() {
         case "json": return .json
@@ -140,8 +145,9 @@ private enum SyntaxLanguage: Sendable {
         }
     }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
+        case .plainText: return L10n.text(.plainText)
         case .json: return "JSON"
         case .jsonWithComments: return "JSONC"
         case .python: return "Python"
@@ -159,6 +165,7 @@ private enum SyntaxLanguage: Sendable {
 
     var keywords: Set<String> {
         switch self {
+        case .plainText: return []
         case .json, .jsonWithComments: return KeywordSets.json
         case .python: return KeywordSets.python
         case .java: return KeywordSets.java
