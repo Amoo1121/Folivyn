@@ -1,0 +1,5 @@
+"preview.title" = "Folivyn · Read-only preview";
+"preview.loading" = "Loading preview…";
+"preview.truncated" = "Partial preview · Limited to 200 KiB or 2,000 lines";
+"preview.empty" = "Empty file";
+"preview.unavailable" = "Preview unavailable";

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleExecutable</key><string>FolivynPreview</string>
+    <key>CFBundleIdentifier</key><string>io.github.amoo1121.Folivyn.Preview</string>
+    <key>CFBundleName</key><string>Folivyn Preview</string>
+    <key>CFBundleDisplayName</key><string>Folivyn Preview</string>
+    <key>CFBundlePackageType</key><string>XPC!</string>
+    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string></array>
+    <key>LSMinimumSystemVersion</key><string>14.0</string>
+    <key>NSExtension</key><dict>
+        <key>NSExtensionPointIdentifier</key><string>com.apple.quicklook.preview</string>
+        <key>NSExtensionPrincipalClass</key><string>FolivynPreviewViewController</string>
+        <key>NSExtensionAttributes</key><dict>
+            <key>QLSupportedContentTypes</key><array>
+                <string>public.text</string><string>public.source-code</string>
+                <string>public.plain-text</string><string>public.utf8-plain-text</string>
+                <string>public.utf16-plain-text</string><string>com.apple.log</string>
+                <string>public.python-script</string><string>com.sun.java-source</string>
+                <string>com.netscape.javascript-source</string><string>com.microsoft.typescript</string>
+                <string>public.shell-script</string><string>public.bash-script</string>
+                <string>public.zsh-script</string><string>public.ksh-script</string>
+                <string>public.swift-source</string><string>public.c-source</string>
+                <string>public.c-header</string><string>public.c-plus-plus-source</string>
+                <string>public.c-plus-plus-header</string><string>public.objective-c-source</string>
+                <string>net.daringfireball.markdown</string><string>public.yaml</string>
+                <string>public.toml</string>
+                <string>public.json</string><string>public.comma-separated-values-text</string>
+                <string>public.tab-separated-values-text</string>
+            </array>
+            <key>QLSupportsSearchableItems</key><false/>
+            <key>QLIsDataBasedPreview</key><false/>
+        </dict>
+    </dict>
+</dict></plist>

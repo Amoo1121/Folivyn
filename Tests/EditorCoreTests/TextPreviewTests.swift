@@ -183,4 +183,70 @@ final class TextPreviewTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: link), original)
         XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)?.intValue, 0o400)
     }
+
+    func testCancellationBeforeReadingDoesNotAttemptTheMissingFile() {
+        let missing = directory.appendingPathComponent("cancelled-before-open")
+        XCTAssertThrowsError(try TextPreview.read(missing, isCancelled: { true })) {
+            XCTAssertTrue($0 is CancellationError)
+        }
+    }
+
+    func testDefaultCancellationObservesTheCurrentTask() async {
+        let missing = directory.appendingPathComponent("cancelled-task-before-open")
+        let task = Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try TextPreview.read(missing)
+        }
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled task must not return a preview")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "Cancellation was replaced by \(error)")
+        }
+    }
+
+    func testCancellationAtReadDecodeAndLineScanCheckpointsIsNeverWrapped() throws {
+        // Exercise every cancellation checkpoint reached by each encoding, not
+        // just the initial guard. Long single-line text also scans the line budget.
+        let source = String(repeating: "a中🦊", count: 3_000)
+        let variants = [Data(source.utf8),
+                        Data([0xFF, 0xFE]) + source.data(using: .utf16LittleEndian)!,
+                        Data([0xFE, 0xFF]) + source.data(using: .utf16BigEndian)!]
+        for bytes in variants {
+            let url = try file(bytes)
+            let baseline = PreviewCancellationCounter()
+            XCTAssertEqual(try TextPreview.read(url, isCancelled: { baseline.check() }).text, source)
+            // This input must reach periodic work checks as well as phase guards.
+            XCTAssertGreaterThan(baseline.count, 20)
+            for cancellationPoint in 1...baseline.count {
+                let cancellation = PreviewCancellationCounter(cancelAt: cancellationPoint)
+                XCTAssertThrowsError(try TextPreview.read(url, isCancelled: { cancellation.check() })) {
+                    XCTAssertTrue($0 is CancellationError, "Cancellation was wrapped as \($0)")
+                }
+                XCTAssertEqual(cancellation.count, cancellationPoint)
+            }
+            XCTAssertEqual(try Data(contentsOf: url), bytes)
+        }
+    }
+}
+
+private final class PreviewCancellationCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private let cancelAt: Int?
+    private var checks = 0
+
+    init(cancelAt: Int? = nil) { self.cancelAt = cancelAt }
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return checks
+    }
+
+    func check() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        checks += 1
+        return cancelAt.map { checks >= $0 } ?? false
+    }
 }

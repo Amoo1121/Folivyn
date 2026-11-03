@@ -35,28 +35,35 @@ public enum TextPreview {
     ///
     /// Only the bounded prefix is validated. No claim is made about unseen bytes
     /// later in a large file. Files are opened read-only, including hard links.
+    /// Cancellation defaults to the current Task and is observed between reads
+    /// and during scanning; it cannot interrupt a kernel read already in progress.
     public static func read(
         _ url: URL,
         byteLimit: Int = defaultByteLimit,
-        lineLimit: Int = defaultLineLimit
+        lineLimit: Int = defaultLineLimit,
+        isCancelled: @Sendable () -> Bool = { Task<Never, Never>.isCancelled }
     ) throws -> LoadedTextPreview {
         precondition(byteLimit > 0 && byteLimit <= Int.max - 7 && lineLimit > 0)
+        try checkCancellation(isCancelled)
         guard url.isFileURL else { throw DocumentFileError.invalidURL(url) }
         let target = url.standardizedFileURL.resolvingSymlinksInPath()
-        let bytes = try readPrefix(target, limit: byteLimit + 7)
+        let bytes = try readPrefix(target, limit: byteLimit + 7, isCancelled: isCancelled)
+        try checkCancellation(isCancelled)
         let decoded: (text: String, encoding: TextFileEncoding, truncated: Bool)
         if bytes.starts(with: [0xFF, 0xFE]) {
-            let result = try decodeUTF16(bytes, byteLimit: byteLimit, littleEndian: true)
+            let result = try decodeUTF16(bytes, byteLimit: byteLimit, littleEndian: true, isCancelled: isCancelled)
             decoded = (result.text, .utf16LittleEndianBOM, result.truncated)
         } else if bytes.starts(with: [0xFE, 0xFF]) {
-            let result = try decodeUTF16(bytes, byteLimit: byteLimit, littleEndian: false)
+            let result = try decodeUTF16(bytes, byteLimit: byteLimit, littleEndian: false, isCancelled: isCancelled)
             decoded = (result.text, .utf16BigEndianBOM, result.truncated)
         } else {
             let hasBOM = bytes.starts(with: [0xEF, 0xBB, 0xBF])
-            let result = try decodeUTF8(bytes, offset: hasBOM ? 3 : 0, byteLimit: byteLimit)
+            let result = try decodeUTF8(bytes, offset: hasBOM ? 3 : 0, byteLimit: byteLimit, isCancelled: isCancelled)
             decoded = (result.text, hasBOM ? .utf8BOM : .utf8, result.truncated)
         }
-        let limited = limitLines(decoded.text, to: lineLimit)
+        try checkCancellation(isCancelled)
+        let limited = try limitLines(decoded.text, to: lineLimit, isCancelled: isCancelled)
+        try checkCancellation(isCancelled)
         return LoadedTextPreview(
             text: limited.text,
             encoding: decoded.encoding,
@@ -64,10 +71,12 @@ public enum TextPreview {
         )
     }
 
-    private static func readPrefix(_ url: URL, limit: Int) throws -> [UInt8] {
+    private static func readPrefix(_ url: URL, limit: Int,
+                                   isCancelled: @Sendable () -> Bool) throws -> [UInt8] {
         // Nonblocking open prevents a FIFO (including a path replaced between
         // resolution and open) from waiting for a writer. Validate the opened FD,
         // rather than relying on metadata for a potentially different path.
+        try checkCancellation(isCancelled)
         let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC)
         guard descriptor >= 0 else { throw readError(url, code: errno) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
@@ -81,10 +90,16 @@ public enum TextPreview {
             var data = Data()
             data.reserveCapacity(limit)
             while data.count < limit {
-                guard let chunk = try handle.read(upToCount: limit - data.count), !chunk.isEmpty else { break }
+                try checkCancellation(isCancelled)
+                // Check between bounded reads. A synchronous kernel read already
+                // in progress cannot itself be interrupted by Task cancellation.
+                guard let chunk = try handle.read(upToCount: min(limit - data.count, 16 * 1_024)),
+                      !chunk.isEmpty else { break }
                 data.append(chunk)
             }
             return Array(data)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw DocumentFileError.readFailed(url, reason: error.localizedDescription)
         }
@@ -96,11 +111,17 @@ public enum TextPreview {
     }
 
     private static func decodeUTF8(
-        _ bytes: [UInt8], offset: Int, byteLimit: Int
+        _ bytes: [UInt8], offset: Int, byteLimit: Int,
+        isCancelled: @Sendable () -> Bool
     ) throws -> (text: String, truncated: Bool) {
         let end = min(bytes.count, offset + byteLimit)
         var cursor = offset
+        var cancellationCheckpoint = cursor
         while cursor < end {
+            if cursor - cancellationCheckpoint >= 1_024 {
+                try checkCancellation(isCancelled)
+                cancellationCheckpoint = cursor
+            }
             let first = bytes[cursor]
             let length: Int
             switch first {
@@ -136,10 +157,12 @@ public enum TextPreview {
     }
 
     private static func decodeUTF16(
-        _ bytes: [UInt8], byteLimit: Int, littleEndian: Bool
+        _ bytes: [UInt8], byteLimit: Int, littleEndian: Bool,
+        isCancelled: @Sendable () -> Bool
     ) throws -> (text: String, truncated: Bool) {
         let end = min(bytes.count, 2 + byteLimit)
         var cursor = 2
+        var cancellationCheckpoint = cursor
         var units = [UInt16]()
         func unit(at index: Int) -> UInt16 {
             let first = UInt16(bytes[index])
@@ -147,6 +170,10 @@ public enum TextPreview {
             return littleEndian ? first | (second << 8) : (first << 8) | second
         }
         while cursor < end {
+            if cursor - cancellationCheckpoint >= 1_024 {
+                try checkCancellation(isCancelled)
+                cancellationCheckpoint = cursor
+            }
             guard cursor + 2 <= bytes.count else { throw DocumentFileError.invalidTextEncoding }
             let first = unit(at: cursor)
             let length: Int
@@ -177,12 +204,19 @@ public enum TextPreview {
         }
     }
 
-    private static func limitLines(_ text: String, to limit: Int) -> (text: String, truncated: Bool) {
+    private static func limitLines(_ text: String, to limit: Int,
+                                   isCancelled: @Sendable () -> Bool) throws -> (text: String, truncated: Bool) {
         let scalars = text.unicodeScalars
         var cursor = scalars.startIndex
         var lines = 0
+        var scannedScalars = 0
         while cursor < scalars.endIndex {
+            if scannedScalars >= 1_024 {
+                try checkCancellation(isCancelled)
+                scannedScalars = 0
+            }
             let scalar = scalars[cursor]
+            scannedScalars += 1
             cursor = scalars.index(after: cursor)
             if scalar == "\r", cursor < scalars.endIndex, scalars[cursor] == "\n" {
                 cursor = scalars.index(after: cursor)
@@ -195,5 +229,9 @@ public enum TextPreview {
             }
         }
         return (text, false)
+    }
+
+    private static func checkCancellation(_ isCancelled: @Sendable () -> Bool) throws {
+        if isCancelled() { throw CancellationError() }
     }
 }

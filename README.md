@@ -12,6 +12,7 @@ Folivyn is a personal project that is actively being improved. Feedback, bug rep
 - **Reload from disk.** Pick up changes made by other tools. If you have unsaved edits, cancel, discard them, or save a copy before reloading.
 - **Local syntax highlighting.** Read Python, Java, JavaScript, TypeScript, JSON, JSONC, and shell scripts with basic syntax colors. Other text formats open normally.
 - **Find and replace.** Use the native find bar for literal search, next/previous matches, and replacement within the current tab.
+- **Finder Quick Look.** The bundled extension provides a read-only, syntax-colored source preview. Python and JSON have been verified through Finder's Space key; provider selection for other types depends on macOS and installed apps.
 - **Careful file handling.** Preserve supported encodings, byte-order marks, and line endings. Check for external changes before saving and report conflicts.
 - **Fully offline.** Editing and highlighting work without an account, connection, or downloaded language packs. No telemetry or online services.
 - **Native and compact.** Built with Swift and AppKit, using macOS system frameworks and no third-party packages.
@@ -55,8 +56,13 @@ English is the default language. Simplified Chinese is included. The interface f
 - Text files up to **10 MiB**, encoded as UTF-8 (with or without BOM) or UTF-16 LE/BE with BOM.
 - Basic syntax highlighting up to **200 KiB** and **20,000 lines**. Larger documents remain editable as plain text.
 - CSV and JSON can be edited as text. Dedicated CSV tables and JSON tree views are planned.
+- Quick Look reads at most **200 KiB** of encoded text or **2,000 lines**, marks truncated previews, and rejects invalid encoding or binary controls. It never edits or runs the file.
 
 Files with unsupported or invalid encodings are rejected without replacement decoding. Symbolic links are saved through to their targets; files with multiple hard links must be saved to a new location. Saving checks for external changes, but simultaneous writes by other processes can still race the final check and replacement.
+
+### Finder preview
+
+Launch the built app once, then select a supported file in Finder and press Space. The preview header says **Folivyn · Read-only preview** when this extension is active. macOS may select another installed provider; CSV currently opens with Numbers' preview on the tested Mac. Folivyn does not change your default opening app. See [Quick Look setup and verification](docs/quick-look-validation.md) for local-build registration, tested types, and limitations.
 
 ## Development
 
@@ -73,7 +79,7 @@ See the [native acceptance record](docs/native-validation.md) for tested file-ha
 
 ## Roadmap
 
-CSV table and JSON tree views, Finder Quick Look, line numbers, and draft recovery are planned. These features are not included in the current app.
+CSV table and JSON tree views, line numbers, and draft recovery are planned. These features are not included in the current app.
 
 ## Contributing
 

@@ -1,0 +1,5 @@
+"preview.title" = "Folivyn · 只读预览";
+"preview.loading" = "正在加载预览…";
+"preview.truncated" = "部分预览 · 最多显示 200 KiB 或 2,000 行";
+"preview.empty" = "空文件";
+"preview.unavailable" = "无法预览";
