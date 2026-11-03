@@ -67,6 +67,55 @@ final class JSONStructureTests: XCTestCase {
         XCTAssertNil(structure.rawToken(in: NSRange(location: Int.max, length: Int.max)))
     }
 
+    func testPointerLookupRequiresAnExactNodeRange() throws {
+        let source = " \n{\"a/b~\": [0, {\"🦊\":true}], \"a/b~\": null} \r"
+        let structure = try JSONStructure.parse(source)
+        let members = try object(structure.root)
+        let elements = try array(members[0].value)
+        let nested = try object(elements[1])
+        let expected: [NSRange: JSONPointer] = [
+            structure.root.tokenRange: JSONPointer(value: "", isAmbiguous: false),
+            members[0].value.tokenRange: JSONPointer(value: "/a~1b~0", isAmbiguous: true),
+            elements[0].tokenRange: JSONPointer(value: "/a~1b~0/0", isAmbiguous: true),
+            elements[1].tokenRange: JSONPointer(value: "/a~1b~0/1", isAmbiguous: true),
+            nested[0].value.tokenRange: JSONPointer(value: "/a~1b~0/1/🦊", isAmbiguous: true),
+            members[1].value.tokenRange: JSONPointer(value: "/a~1b~0", isAmbiguous: true)
+        ]
+        // Enumerate partial tokens, keys, whitespace, delimiters, surrogate
+        // halves, cross-sibling selections and positions just outside the source.
+        for location in 0...(source.utf16.count + 1) {
+            for length in 0...(source.utf16.count + 1) {
+                let range = NSRange(location: location, length: length)
+                XCTAssertEqual(structure.pointer(to: range), expected[range], "Range: \(range)")
+            }
+        }
+        for range in [NSRange(location: -1, length: 1), NSRange(location: 0, length: -1),
+                      NSRange(location: Int.max, length: Int.max), NSRange(location: 0, length: Int.max)] {
+            XCTAssertNil(structure.pointer(to: range))
+        }
+    }
+
+    func testPointerWithNearBudgetLongAncestorAndWideArray() throws {
+        let key = String(repeating: "k", count: 800 * 1_024)
+        let elementCount = 99_998
+        let source = "{\"" + key + "\":[" + String(repeating: "0,", count: elementCount - 1) + "0]}"
+        XCTAssertGreaterThan(source.utf8.count, 1_000_000)
+        XCTAssertLessThanOrEqual(source.utf8.count, JSONStructure.Limits().maximumUTF8Bytes)
+        let structure = try JSONStructure.parse(source)
+        XCTAssertEqual(structure.nodeCount, JSONStructure.Limits().maximumNodes)
+        let elements = try array(object(structure.root)[0].value)
+        let last = try XCTUnwrap(elements.last)
+        let started = ContinuousClock.now
+        let pointer = structure.pointer(to: last)
+        let elapsed = started.duration(to: .now)
+        XCTAssertEqual(pointer, JSONPointer(value: "/" + key + "/\(elementCount - 1)", isAmbiguous: false))
+        XCTAssertEqual(structure.source.utf8.count, source.utf8.count)
+        // Record a sample for review without making correctness depend on the
+        // host's load or a fragile millisecond threshold. The former traversal
+        // copied this ancestor key for every preceding array element.
+        print("JSON Pointer near-budget sample: \(source.utf8.count) bytes, \(structure.nodeCount) nodes, \(elapsed)")
+    }
+
     func testStrictJSONAcceptsScalarRootsWhitespaceAndValidSurrogatePairs() throws {
         let valid = ["null", "true", "false", "123", "[]", "{}", "\t\r\n [true, false, null] ",
                      #""\uD800\uDC00""#, #""\uDBFF\uDFFF""#, #""𐀀é🦊""#]

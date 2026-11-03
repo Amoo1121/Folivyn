@@ -70,31 +70,54 @@ public struct JSONStructure: Sendable {
     }
 
     public func pointer(to tokenRange: NSRange) -> JSONPointer? {
-        func visit(_ node: JSONNode, path: String, ambiguous: Bool) -> JSONPointer? {
-            if node.tokenRange == tokenRange {
-                return JSONPointer(value: path, isAmbiguous: ambiguous)
-            }
-            guard tokenRange.location >= node.tokenRange.location,
-                  tokenRange.length >= 0,
-                  tokenRange.location <= NSMaxRange(node.tokenRange),
-                  tokenRange.length <= NSMaxRange(node.tokenRange) - tokenRange.location else { return nil }
-            switch node.value {
-            case .object(let members):
-                for member in members {
-                    let escaped = member.key.replacingOccurrences(of: "~", with: "~0")
-                        .replacingOccurrences(of: "/", with: "~1")
-                    if let result = visit(member.value, path: path + "/" + escaped,
-                                          ambiguous: ambiguous || member.isDuplicateKey) { return result }
-                }
-            case .array(let elements):
-                for (index, child) in elements.enumerated() {
-                    if let result = visit(child, path: path + "/\(index)", ambiguous: ambiguous) { return result }
-                }
-            default: break
+        // Every JSON value occupies a nonempty token. Reject invalid arithmetic
+        // before comparing ranges; callers may supply a selection, not a node.
+        guard tokenRange.location >= 0, tokenRange.length > 0 else { return nil }
+
+        func childIndex(count: Int, rangeAt: (Int) -> NSRange) -> Int? {
+            var lower = 0, upper = count
+            while lower < upper {
+                let middle = (lower + upper) / 2
+                let range = rangeAt(middle)
+                if tokenRange.location < range.location { upper = middle }
+                else if tokenRange.location >= NSMaxRange(range) { lower = middle + 1 }
+                else { return middle }
             }
             return nil
         }
-        return visit(root, path: "", ambiguous: false)
+
+        var node = root
+        var components: [String] = []
+        var ambiguous = false
+        while true {
+            guard tokenRange.location >= node.tokenRange.location,
+                  tokenRange.location <= NSMaxRange(node.tokenRange),
+                  tokenRange.length <= NSMaxRange(node.tokenRange) - tokenRange.location else { return nil }
+            if node.tokenRange == tokenRange {
+                // Build the full path only once, after locating an exact node.
+                // A long ancestor key must not be copied for every sibling (or
+                // for every level) on the main-thread navigation path.
+                let escaped = components.map {
+                    $0.replacingOccurrences(of: "~", with: "~0")
+                        .replacingOccurrences(of: "/", with: "~1")
+                }
+                return JSONPointer(value: escaped.isEmpty ? "" : "/" + escaped.joined(separator: "/"),
+                                   isAmbiguous: ambiguous)
+            }
+            switch node.value {
+            case .object(let members):
+                guard let index = childIndex(count: members.count, rangeAt: { members[$0].value.tokenRange }) else { return nil }
+                let member = members[index]
+                components.append(member.key)
+                ambiguous = ambiguous || member.isDuplicateKey
+                node = member.value
+            case .array(let elements):
+                guard let index = childIndex(count: elements.count, rangeAt: { elements[$0].tokenRange }) else { return nil }
+                components.append(String(index))
+                node = elements[index]
+            default: return nil
+            }
+        }
     }
 }
 
