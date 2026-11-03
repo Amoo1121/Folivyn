@@ -9,6 +9,26 @@ Finder's Space preview, fix defects, and continue implementing the design in
 small GitHub commits. The earlier native acceptance covered the existing P0
 text editor. It did not establish that Finder Quick Look or full V1 was complete.
 
+## Progress after the baseline — 2026-11-03
+
+The tables below retain the historical baseline. Current progress superseding
+individual missing entries is recorded here without declaring full V1 complete:
+
+- F01: a bounded, sandboxed Quick Look extension is implemented; native Finder
+  Python/JSON/large-file previews were rechecked after the cancellation fix.
+  CSV provider selection, fresh installation, distribution and other remaining
+  checks are explicit in [Quick Look validation](quick-look-validation.md).
+- F04: native per-tab Find/Replace, Unicode replacement, shared undo and saved
+  bytes have native evidence.
+- F12–F15: bounded CSV ranges, local cell editing, JSON trees/search/source
+  mapping and one revision-checked source/undo are implemented. See
+  [structured-view validation](structured-views-validation.md), including
+  denied-network Chinese workflows and defects found and fixed.
+- F02/F03/F05: independent safe drop/recent-file and TextKit 2 line-ruler
+  foundations are committed; main-window integration and native checks follow.
+- Other missing behavior and G01–G06 gates remain open. Historical counts and
+  sizes below identify older artifacts and are not measurements of new builds.
+
 ## Scope and authority
 
 - [Product specification](product-spec.zh-CN.md) defines P0, the complete V1

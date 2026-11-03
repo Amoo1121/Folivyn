@@ -13,6 +13,8 @@ Folivyn is a personal project that is actively being improved. Feedback, bug rep
 - **Local syntax highlighting.** Read Python, Java, JavaScript, TypeScript, JSON, JSONC, and shell scripts with basic syntax colors. Other text formats open normally.
 - **Find and replace.** Use the native find bar for literal search, next/previous matches, and replacement within the current tab.
 - **Finder Quick Look.** The bundled extension provides a read-only, syntax-colored source preview. Python and JSON have been verified through Finder's Space key; provider selection for other types depends on macOS and installed apps.
+- **CSV and TSV tables.** Read string-valued cells, choose comma or tab delimiters, use an optional display header, and edit one cell through the document's existing undo history.
+- **JSON navigation.** Browse a collapsible tree beside the source, search keys and values, and copy unambiguous JSON Pointers. Duplicate keys and original number spellings remain intact.
 - **Careful file handling.** Preserve supported encodings, byte-order marks, and line endings. Check for external changes before saving and report conflicts.
 - **Fully offline.** Editing and highlighting work without an account, connection, or downloaded language packs. No telemetry or online services.
 - **Native and compact.** Built with Swift and AppKit, using macOS system frameworks and no third-party packages.
@@ -55,7 +57,8 @@ English is the default language. Simplified Chinese is included. The interface f
 
 - Text files up to **10 MiB**, encoded as UTF-8 (with or without BOM) or UTF-16 LE/BE with BOM.
 - Basic syntax highlighting up to **200 KiB** and **20,000 lines**. Larger documents remain editable as plain text.
-- CSV and JSON can be edited as text. Dedicated CSV tables and JSON tree views are planned.
+- CSV/TSV table views support **5 MiB** of decoded UTF-8 text, **100,000 records**, **256 columns**, and **250,000 fields**. Each cell is text; formulas are not executed and numbers are not inferred. Missing fields must be added in Source.
+- JSON trees support **1 MiB** of decoded UTF-8 text, **128 nested containers**, and **100,000 values**. Trees are read-only; edit the source to change JSON. Invalid or over-budget structures keep their source editable. JSONC remains source-only.
 - Quick Look reads at most **200 KiB** of encoded text or **2,000 lines**, marks truncated previews, and rejects invalid encoding or binary controls. It never edits or runs the file.
 
 Files with unsupported or invalid encodings are rejected without replacement decoding. Symbolic links are saved through to their targets; files with multiple hard links must be saved to a new location. Saving checks for external changes, but simultaneous writes by other processes can still race the final check and replacement.
@@ -63,6 +66,12 @@ Files with unsupported or invalid encodings are rejected without replacement dec
 ### Finder preview
 
 Launch the built app once, then select a supported file in Finder and press Space. The preview header says **Folivyn · Read-only preview** when this extension is active. macOS may select another installed provider; CSV currently opens with Numbers' preview on the tested Mac. Folivyn does not change your default opening app. See [Quick Look setup and verification](docs/quick-look-validation.md) for local-build registration, tested types, and limitations.
+
+### Structured files
+
+CSV and TSV open in Table view. Double-click an existing cell to edit its full value, including embedded line breaks, then choose Apply. The display uses `↵` for line breaks; the file keeps its original text. Use Source to edit text directly. Switching views, changing the delimiter, or using the first row as a header never rewrites the file.
+
+JSON opens with Source and Tree side by side. Selecting a node locates its exact source token; selecting source text locates its containing node. Search the tree, then use Previous or Next to navigate results. Duplicate paths disable Copy JSON Pointer because they do not identify one unique value.
 
 ## Development
 
@@ -76,10 +85,11 @@ env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 The code is organized into `EditorApp` (AppKit interface), `EditorUI` (shared highlighting and interface strings), and `EditorCore` (file access and text models). Localized strings live in each target's `Resources/en.lproj` and `Resources/zh-Hans.lproj` directories.
 
 See the [native acceptance record](docs/native-validation.md) for tested file-handling and editing flows, offline checks, and verification limits.
+The [structured-view validation record](docs/structured-views-validation.md) covers CSV/JSON edits, navigation, and their remaining acceptance work.
 
 ## Roadmap
 
-CSV table and JSON tree views, line numbers, and draft recovery are planned. These features are not included in the current app.
+Line numbers, jump to line, more file-opening workflows, and draft recovery are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
 
 ## Contributing
 

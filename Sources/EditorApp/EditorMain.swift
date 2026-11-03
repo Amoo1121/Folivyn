@@ -26,6 +26,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     let item = NSTabViewItem()
     let syntax = SyntaxHighlighter()
     let undoStack = UndoManager()
+    private(set) var presentation: DocumentPresentation?
     var file: LoadedTextFile?
     var baseline = ""
     var diskChanged = false
@@ -75,7 +76,9 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         scrollView.autoresizingMask = [.width, .height]
         textView.string = baseline
         item.identifier = id
-        item.view = scrollView
+        presentation = DocumentPresentation(session: self)
+        item.view = presentation?.view
+        sourceChanged = { [weak self] in self?.presentation?.sourceDidChange() }
         item.label = name
         syntax.highlight(textView: textView, fileURL: file?.url)
     }
@@ -128,6 +131,10 @@ final class EditorSession: NSObject, NSTextViewDelegate {
 
     func undoManager(for view: NSTextView) -> UndoManager? { undoStack }
 
+    func textViewDidChangeSelection(_ notification: Notification) {
+        presentation?.sourceSelectionDidChange()
+    }
+
     func acceptSaved(_ loaded: LoadedTextFile) {
         // Invalidate checks started before a save or reload, even when the
         // resulting bytes happen to match the previous baseline.
@@ -136,6 +143,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         baseline = loaded.text
         diskChanged = false
         syntax.highlight(textView: textView, fileURL: loaded.url)
+        presentation?.configure()
         changed?()
     }
 
@@ -177,6 +185,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     private let status = NSTextField(labelWithString: "")
     private var sessions: [EditorSession] = []
     private var reloadButton: NSButton!
+    private let viewMode = NSSegmentedControl()
     private var mayTerminate = false
     private var pendingURLs: [URL] = []
 
@@ -195,6 +204,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
+        guard window?.attachedSheet == nil else { sender.reply(toOpenOrPrint: .failure); return }
         let urls = filenames.map { URL(fileURLWithPath: $0) }
         if window == nil { pendingURLs.append(contentsOf: urls) }
         else { open(urls); window.makeKeyAndOrderFront(nil) }
@@ -209,9 +219,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     func applicationDidBecomeActive(_ notification: Notification) { checkDiskChanges() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        (mayTerminate || confirmCloseAll()) ? .terminateNow : .terminateCancel
+        guard window?.attachedSheet == nil else { return .terminateCancel }
+        return (mayTerminate || confirmCloseAll()) ? .terminateNow : .terminateCancel
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard sender.attachedSheet == nil else { return false }
         mayTerminate = confirmCloseAll()
         return mayTerminate
     }
@@ -236,8 +248,8 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         addMenu(L10n.text(.fileMenu), menu: file, to: bar)
 
         let edit = NSMenu(title: L10n.text(.editMenu))
-        edit.addItem(withTitle: L10n.text(.undo), action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = edit.addItem(withTitle: L10n.text(.redo), action: Selector(("redo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: L10n.text(.undo), action: #selector(DocumentPresentationView.undo(_:)), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: L10n.text(.redo), action: #selector(DocumentPresentationView.redo(_:)), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
         edit.addItem(withTitle: L10n.text(.cut), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
@@ -284,10 +296,15 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     @objc private func performTextFinderAction(_ sender: NSMenuItem) {
         // The find bar's field can be first responder. Always search this tab's
         // document, rather than a field editor or another session's text view.
-        current?.textView.performTextFinderAction(sender)
+        guard let session = current else { return }
+        if session.presentation?.kind == .csv {
+            guard session.presentation?.setShowsStructure(false) == true else { return }
+        }
+        session.textView.performTextFinderAction(sender)
     }
 
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        guard window?.attachedSheet == nil else { return false }
         if item.action == #selector(performTextFinderAction(_:)) {
             return current?.textView.validateUserInterfaceItem(item) ?? false
         }
@@ -314,6 +331,12 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             toolbar.addArrangedSubview(button)
             if action == #selector(reloadDocument) { reloadButton = button }
         }
+        viewMode.segmentCount = 2
+        viewMode.trackingMode = .selectOne
+        viewMode.target = self
+        viewMode.action = #selector(changeViewMode)
+        viewMode.setAccessibilityIdentifier("document-view-mode")
+        toolbar.addArrangedSubview(viewMode)
         tabs.tabViewType = .topTabsBezelBorder
         tabs.allowsTruncatedLabels = true
         tabs.delegate = self
@@ -345,12 +368,12 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         tabs.addTabViewItem(session.item)
         tabs.selectTabViewItem(session.item)
         refresh()
-        window.makeFirstResponder(session.textView)
+        window.makeFirstResponder(session.presentation?.preferredResponder)
     }
 
     func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
         refresh()
-        if let session = current { window?.makeFirstResponder(session.textView) }
+        if let session = current { window?.makeFirstResponder(session.presentation?.preferredResponder) }
     }
 
     private func refresh() {
@@ -360,6 +383,10 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         window?.representedURL = session.file?.url
         window?.isDocumentEdited = session.dirty
         reloadButton?.isEnabled = session.file != nil
+        viewMode.isHidden = session.presentation?.supportsStructure != true
+        viewMode.setLabel(L10n.text(.sourceView), forSegment: 0)
+        viewMode.setLabel(session.presentation?.structureTitle ?? "", forSegment: 1)
+        viewMode.selectedSegment = session.presentation?.showsStructure == true ? 1 : 0
         var parts = [session.file?.encoding.displayName ?? "UTF-8", SyntaxHighlighter.languageName(for: session.file?.url)]
         if session.syntax.isLimited { parts.append(L10n.text(.largeText)) }
         if session.dirty { parts.append(L10n.text(.unsaved)) }
@@ -369,8 +396,16 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         status.toolTip = status.stringValue
     }
 
-    @objc private func newDocument() { addSession(EditorSession()) }
+    @objc private func newDocument() {
+        guard window.attachedSheet == nil else { return }
+        addSession(EditorSession())
+    }
+    @objc private func changeViewMode() {
+        _ = current?.presentation?.setShowsStructure(viewMode.selectedSegment == 1)
+        refresh()
+    }
     @objc private func openDocument() {
+        guard window.attachedSheet == nil else { return }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
@@ -408,6 +443,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     private func save(_ session: EditorSession, saveAs: Bool) -> Bool {
+        guard window.attachedSheet == nil else { return false }
         let chosen = saveAs || session.file == nil
         guard let url = chosen ? pickSaveURL(for: session) : session.file?.url else { return false }
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath()
@@ -422,6 +458,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
                 expectedSnapshot: sameFile ? session.file?.diskSnapshot : nil,
                 overwriteExternalChanges: chosen && !sameFile)
             session.acceptSaved(saved)
+            if chosen { window.makeFirstResponder(session.presentation?.preferredResponder) }
             return true
         } catch DocumentFileError.externalConflict {
             session.diskChanged = true
@@ -437,6 +474,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     @objc private func reloadDocument() {
+        guard window.attachedSheet == nil else { return }
         guard let session = current, let source = session.file?.url else { return }
         if session.dirty {
             let alert = NSAlert()
@@ -465,7 +503,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             // Load completely before replacing text: failure leaves the current buffer intact.
             let loaded = try DocumentFile.read(source)
             session.reload(loaded)
-            window.makeFirstResponder(session.textView)
+            window.makeFirstResponder(session.presentation?.preferredResponder)
         } catch { showError(error) }
     }
 
@@ -503,9 +541,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     @objc private func closeTab() {
+        guard window.attachedSheet == nil else { return }
         guard let session = current else { return }
         if sessions.count == 1 { window.performClose(nil); return }
         guard confirmClose(session) else { return }
+        session.presentation?.cancel()
         sessions.removeAll { $0 === session }
         tabs.removeTabViewItem(session.item)
         refresh()
@@ -513,6 +553,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     @objc private func nextTab() { cycleTab(1) }
     @objc private func previousTab() { cycleTab(-1) }
     private func cycleTab(_ offset: Int) {
+        guard window.attachedSheet == nil else { return }
         guard let session = current, let index = sessions.firstIndex(where: { $0 === session }) else { return }
         tabs.selectTabViewItem(sessions[(index + offset + sessions.count) % sessions.count].item)
     }

@@ -3,7 +3,7 @@
 Native Finder checks: 2026-10-27. Environment: Apple Silicon, macOS 26.5.1 (25F80),
 Xcode 26.6 (17F113). These observations cover the local development build;
 they do not establish a notarized release or compatibility with macOS 14.
-Cancellation review and focused automated retest: 2026-11-03.
+Cancellation review, automated retest, and rebuilt Finder smoke check: 2026-11-03.
 
 ## What was observed in Finder
 
@@ -128,9 +128,17 @@ an 8 GiB sparse file with an unread invalid tail, binary controls, directories,
 missing files, FIFO rejection, hard links, read-only files, unchanged bytes,
 and cancellation at every checkpoint exercised by the fixtures. A separate
 test confirms the default callback observes an actually cancelled Swift Task
-before attempting to open a missing file. Native Finder
-checks above were performed before the cancellation correction; they should be
-repeated on the rebuilt extension for final acceptance.
+before attempting to open a missing file.
+
+At 21:10 on 2026-11-03, the rebuilt extension was registered at the development
+bundle path and checked through Finder Space again. Python and JSON both
+showed the Folivyn header and expected content. The 10 MiB Python fixture showed
+`Partial preview · Limited to 200 KiB or 2,000 lines`. Closing and immediately
+reopening that preview showed the same correct bounded content, without a
+stale-result or crash. This smoke check is not a latency/cancellation stress
+benchmark. The extension executable SHA-256 for this check was
+`4e34d6b280645f314cbc54690f9b3bb421ef53f4cb087d193422c34d3f029e71`.
+
 
 ## Sandboxing and measured resources
 
@@ -161,7 +169,7 @@ It excludes the main editor and Finder processes.
 
 ## Remaining acceptance
 
-- Rebuild and repeat Finder open/close/rapid-switch checks after the cancellation fix.
+- Extend the rebuilt Finder smoke check to repeated rapid switching across different files and recorded cancellation timing.
 - Verify the extension's first-use workflow under denied network access.
 - Verify Simplified Chinese extension UI, appearance changes, and all published file types.
 - Resolve or document provider selection for CSV and other overlapping types using actual Finder evidence.
