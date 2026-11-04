@@ -30,7 +30,7 @@
 "status.unsaved" = "未保存";
 "status.disk_changed" = "磁盘文件已变化，请重新加载或另存";
 "status.new_document" = "新文档";
-"dialog.open.message" = "选择不超过 %ld MiB 的文本或代码文件。";
+"dialog.open.message" = "可编辑不超过 %ld MiB 的文本或代码文件；更大的文件以有限的只读预览打开。";
 "dialog.save_copy.title" = "保存未保存修改的副本";
 "dialog.save.title" = "保存文件";
 "dialog.already_open.title" = "该文件已在另一个标签中打开";
@@ -47,7 +47,7 @@
 "dialog.close.title" = "保存对“%@”的修改？";
 "dialog.close.message" = "未保存的内容将在关闭后丢失。";
 "action.dont_save" = "不保存";
-"dialog.about.message" = "轻巧的 macOS 原生文本编辑器。\n通过标签打开多个文件，使用语法着色编辑，并从磁盘重新加载。\n全部功能在本机运行，完全离线可用。\n支持不超过 %ld MiB 的文件。";
+"dialog.about.message" = "轻巧的 macOS 原生文本编辑器。\n通过标签打开多个文件，使用语法着色编辑，并从磁盘重新加载。\n全部功能在本机运行，完全离线可用。\n可编辑不超过 %ld MiB 的文件；更大的文件以有限的只读预览打开。";
 "dialog.error.title" = "操作未完成";
 "action.ok" = "好";
 "syntax.plain_text" = "纯文本";
@@ -134,3 +134,18 @@
 "action.unindent" = "减少缩进";
 "action.toggle_line_comment" = "切换行注释";
 "editing.line_operation_limit" = "无法在一次操作中安全处理此选区。请选择较少的行后重试。文档未改变。";
+
+"preview.read_only" = "只读预览";
+"preview.loading" = "正在读取预览…";
+"preview.cancelled" = "预览已取消。重新加载可再次尝试。";
+"preview.unavailable" = "无法预览";
+"preview.empty" = "空文本文件";
+"preview.complete" = "完整文本预览";
+"preview.prefix" = "仅显示文件开头，其余内容尚未解码。";
+"preview.budget" = "预览上限：200 KiB 文本或 2,000 行。";
+"preview.open_system" = "使用默认应用打开…";
+"preview.unknown_size" = "无法获取文件大小";
+"preview.file_bytes" = "已观察的文件大小：%lld 字节";
+"preview.displayed_bytes" = "已显示文本：%d 字节（不含 BOM）";
+
+"preview.reload_requires_preview" = "此文件现在需要只读预览。当前正文已保留，请关闭此标签页后重新打开文件进行预览。";

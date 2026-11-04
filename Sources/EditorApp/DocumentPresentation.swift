@@ -6,12 +6,15 @@ import EditorUI
 /// undo; these controllers are disposable projections of its current revision.
 @MainActor
 final class DocumentPresentation {
-    enum Kind { case text, csv, json }
+    enum Kind { case text, csv, json, preview }
     let view = DocumentPresentationView()
     private(set) var kind: Kind = .text
     private(set) var showsStructure = false
     private(set) var csv: CSVTableController?
     private(set) var json: JSONTreeController?
+    private(set) var preview: ReadOnlyPreviewController?
+    private var previewTask: Task<Void, Never>?
+    private var previewGeneration: UInt64 = 0
     private weak var session: EditorSession?
     private var fileExtension = ""
     private var split: NSSplitView?
@@ -22,14 +25,32 @@ final class DocumentPresentation {
         configure()
     }
 
-    var supportsStructure: Bool { kind != .text }
+    var supportsStructure: Bool { kind == .csv || kind == .json }
     var structureTitle: String { L10n.text(kind == .csv ? .tableView : .treeView) }
     var preferredResponder: NSResponder? {
-        showsStructure && kind == .csv ? csv?.tableView : session?.textView
+        if let preview { return preview.textView }
+        return showsStructure && kind == .csv ? csv?.tableView : session?.textView
     }
 
     func configure() {
         guard let session else { return }
+        if let url = session.readOnlyURL {
+            guard preview == nil else { return }
+            kind = .preview
+            showsStructure = false
+            preview = ReadOnlyPreviewController(strings: PreviewStrings.make(), onOpenWithSystem: { url in
+                let workspace = NSWorkspace.shared
+                if let application = workspace.urlForApplication(toOpen: url),
+                   Bundle(url: application)?.bundleIdentifier != Bundle.main.bundleIdentifier {
+                    workspace.open([url], withApplicationAt: application, configuration: NSWorkspace.OpenConfiguration())
+                } else {
+                    workspace.activateFileViewerSelecting([url])
+                }
+            })
+            rebuild()
+            reloadPreview(url)
+            return
+        }
         let ext = session.file?.url.pathExtension.lowercased() ?? ""
         if fileExtension == ext, !view.subviews.isEmpty { return }
         cancel()
@@ -58,7 +79,7 @@ final class DocumentPresentation {
 
     @discardableResult
     func setShowsStructure(_ show: Bool) -> Bool {
-        guard let session, !session.textView.hasMarkedText(), csv?.hasPendingCellEdit != true else { return false }
+        guard let session, !session.isReadOnly, !session.textView.hasMarkedText(), csv?.hasPendingCellEdit != true else { return false }
         let show = show && supportsStructure
         guard show != showsStructure else { return true }
         showsStructure = show
@@ -77,7 +98,9 @@ final class DocumentPresentation {
         for child in view.subviews { child.removeFromSuperview() }
         split = nil
         let content: NSView
-        if showsStructure, let csv {
+        if let preview {
+            content = preview.view
+        } else if showsStructure, let csv {
             content = csv.view
             csv.refresh(immediately: true)
         } else if showsStructure, let json {
@@ -130,8 +153,32 @@ final class DocumentPresentation {
     }
 
     func cancel() {
+        hidePreview()
         csv?.cancelParsing()
         json?.cancel()
+    }
+
+    func showPreviewIfNeeded() {
+        guard preview?.state == .idle || preview?.state == .cancelled else { return }
+        if previewTask == nil { reloadPreview() }
+    }
+
+    func hidePreview() {
+        previewGeneration &+= 1
+        previewTask?.cancel()
+        previewTask = nil
+        preview?.cancel()
+    }
+
+    func reloadPreview(_ url: URL? = nil) {
+        guard let preview, let url = url ?? session?.readOnlyURL else { return }
+        hidePreview()
+        let generation = previewGeneration
+        previewTask = Task { @MainActor [weak self, weak preview] in
+            guard !Task.isCancelled, self?.previewGeneration == generation, let preview else { return }
+            await preview.load(url: url)
+            if self?.previewGeneration == generation { self?.previewTask = nil }
+        }
     }
 }
 
@@ -140,10 +187,11 @@ final class DocumentPresentation {
 @MainActor
 final class DocumentPresentationView: NSView, NSUserInterfaceValidations {
     weak var session: EditorSession?
-    override var undoManager: UndoManager? { session?.undoStack }
-    @objc func undo(_ sender: Any?) { session?.undoStack.undo() }
-    @objc func redo(_ sender: Any?) { session?.undoStack.redo() }
+    override var undoManager: UndoManager? { session?.isReadOnly == true ? nil : session?.undoStack }
+    @objc func undo(_ sender: Any?) { if session?.isReadOnly != true { session?.undoStack.undo() } }
+    @objc func redo(_ sender: Any?) { if session?.isReadOnly != true { session?.undoStack.redo() } }
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        guard session?.isReadOnly != true else { return false }
         if item.action == #selector(undo(_:)) { return session?.undoStack.canUndo == true }
         if item.action == #selector(redo(_:)) { return session?.undoStack.canRedo == true }
         return false

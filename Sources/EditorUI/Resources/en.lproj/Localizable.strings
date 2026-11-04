@@ -30,7 +30,7 @@
 "status.unsaved" = "Unsaved";
 "status.disk_changed" = "File changed on disk. Reload or save a copy.";
 "status.new_document" = "New document";
-"dialog.open.message" = "Choose text or code files up to %ld MiB.";
+"dialog.open.message" = "Edit text or code files up to %ld MiB. Larger files open as a limited read-only preview.";
 "dialog.save_copy.title" = "Save a Copy of Your Changes";
 "dialog.save.title" = "Save File";
 "dialog.already_open.title" = "This file is open in another tab";
@@ -47,7 +47,7 @@
 "dialog.close.title" = "Save changes to “%@”?";
 "dialog.close.message" = "Unsaved changes will be lost when you close this tab.";
 "action.dont_save" = "Don’t Save";
-"dialog.about.message" = "A lightweight, native text editor for macOS.\nOpen files in tabs, edit with syntax highlighting, and reload changes from disk.\nEverything runs on your Mac, fully offline.\nFiles up to %ld MiB are supported.";
+"dialog.about.message" = "A lightweight, native text editor for macOS.\nOpen files in tabs, edit with syntax highlighting, and reload changes from disk.\nEverything runs on your Mac, fully offline.\nEdit files up to %ld MiB; larger files use a limited read-only preview.";
 "dialog.error.title" = "The operation could not be completed";
 "action.ok" = "OK";
 "syntax.plain_text" = "Plain text";
@@ -134,3 +134,18 @@
 "action.unindent" = "Unindent";
 "action.toggle_line_comment" = "Toggle Line Comment";
 "editing.line_operation_limit" = "This selection cannot be edited safely in one operation. Select fewer lines and try again. The document has not changed.";
+
+"preview.read_only" = "Read-only preview";
+"preview.loading" = "Reading preview…";
+"preview.cancelled" = "Preview cancelled. Reload to try again.";
+"preview.unavailable" = "Preview unavailable";
+"preview.empty" = "Empty text file";
+"preview.complete" = "Complete text preview";
+"preview.prefix" = "Prefix only. The rest of the file has not been decoded.";
+"preview.budget" = "Preview limit: 200 KiB of text or 2,000 lines.";
+"preview.open_system" = "Open with Default App…";
+"preview.unknown_size" = "File size unavailable";
+"preview.file_bytes" = "File size observed: %lld bytes";
+"preview.displayed_bytes" = "Displayed text: %d bytes (excluding BOM)";
+
+"preview.reload_requires_preview" = "This file now requires a read-only preview. Your current text has been kept. Close this tab and reopen the file to preview it.";

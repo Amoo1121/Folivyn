@@ -28,10 +28,19 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     let undoStack = UndoManager()
     var lineEditPending = false
     private(set) var lineRuler: LineNumberRuler!
+    private(set) var decorations: EditorDecorations?
     var languageOverride: SyntaxLanguage? {
-        didSet { syntax.highlight(textView: textView, fileURL: file?.url, override: languageOverride); changed?() }
+        didSet {
+            syntax.highlight(textView: textView, fileURL: file?.url, override: languageOverride)
+            decorations?.refresh()
+            changed?()
+        }
     }
     private(set) var presentation: DocumentPresentation?
+    private(set) var fileObservation: DocumentFileObservation?
+    let readOnlyURL: URL?
+    var isReadOnly: Bool { readOnlyURL != nil }
+    var documentURL: URL? { readOnlyURL ?? file?.url }
     var file: LoadedTextFile?
     var baseline = ""
     var diskChanged = false
@@ -39,16 +48,18 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     var sourceChanged: (() -> Void)?
     private(set) var revision: UInt64 = 0
     private var diskCheckGeneration: UInt64 = 0
-    var dirty: Bool { !textView.string.utf16.elementsEqual(baseline.utf16) }
-    var name: String { file?.url.lastPathComponent ?? L10n.text(.untitled) }
+    var dirty: Bool { !isReadOnly && !textView.string.utf16.elementsEqual(baseline.utf16) }
+    var name: String { documentURL?.lastPathComponent ?? L10n.text(.untitled) }
 
-    init(file: LoadedTextFile? = nil) {
+    init(file: LoadedTextFile? = nil, readOnlyURL: URL? = nil) {
+        self.readOnlyURL = readOnlyURL
         super.init()
-        self.file = file
-        baseline = file?.text ?? ""
+        self.file = readOnlyURL == nil ? file : nil
+        baseline = self.file?.text ?? ""
+        textView.isEditable = !isReadOnly
         textView.isRichText = false
         textView.importsGraphics = false
-        textView.allowsUndo = true
+        textView.allowsUndo = !isReadOnly
         textView.usesFindBar = true
         textView.isIncrementalSearchingEnabled = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -89,6 +100,14 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         scrollView.rulersVisible = true
         lineRuler.onIndexChange = { [weak self] in self?.changed?() }
         lineRuler.refresh()
+        if !isReadOnly {
+            decorations = EditorDecorations(textView: textView, snapshot: { [weak self] in
+                guard let self else { return ("", 0) }
+                return (self.textView.string, self.revision)
+            }, language: { [weak self] in
+                self?.languageOverride ?? SyntaxLanguage.forFile(self?.file?.url) ?? .plainText
+            })
+        }
         item.identifier = id
         presentation = DocumentPresentation(session: self)
         item.view = presentation?.view
@@ -100,6 +119,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     func textDidChange(_ notification: Notification) {
         revision &+= 1
         syntax.highlight(textView: textView, fileURL: file?.url, override: languageOverride)
+        decorations?.refresh()
         lineRuler.refresh()
         sourceChanged?()
         changed?()
@@ -152,7 +172,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
 
     @discardableResult
     func goToLine(_ line: Int) -> Bool {
-        guard !textView.hasMarkedText(), presentation?.csv?.hasPendingCellEdit != true,
+        guard !isReadOnly, !textView.hasMarkedText(), presentation?.csv?.hasPendingCellEdit != true,
               lineRuler.displayedRevision == revision,
               let range = lineRuler.currentIndex?.insertionRange(forLine: line) else { return false }
         if presentation?.kind == .csv, presentation?.setShowsStructure(false) != true { return false }
@@ -163,6 +183,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     }
 
     func acceptSaved(_ loaded: LoadedTextFile) {
+        guard !isReadOnly else { return }
         // Invalidate checks started before a save or reload, even when the
         // resulting bytes happen to match the previous baseline.
         diskCheckGeneration &+= 1
@@ -170,8 +191,20 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         baseline = loaded.text
         diskChanged = false
         syntax.highlight(textView: textView, fileURL: loaded.url, override: languageOverride)
+        decorations?.refresh()
         presentation?.configure()
+        fileObservation?.updateURL()
         changed?()
+    }
+
+    func startFileObservation() {
+        guard !isReadOnly, fileObservation == nil else { return }
+        fileObservation = DocumentFileObservation(session: self)
+    }
+
+    func stopFileObservation() {
+        fileObservation?.stop()
+        fileObservation = nil
     }
 
     func beginDiskChangeCheck() -> DiskChangeCheck? {
@@ -189,6 +222,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     }
 
     func reload(_ loaded: LoadedTextFile) {
+        guard !isReadOnly else { return }
         let selection = textView.selectedRange()
         let origin = scrollView.contentView.bounds.origin
         textView.unmarkText()
@@ -213,6 +247,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     private let status = NSTextField(labelWithString: "")
     private var sessions: [EditorSession] = []
     private var reloadButton: NSButton!
+    private var saveButton: NSButton!
     private let viewMode = NSSegmentedControl()
     private var mayTerminate = false
     private var pendingURLs: [URL] = []
@@ -348,7 +383,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     @objc private func performTextFinderAction(_ sender: NSMenuItem) {
         // The find bar's field can be first responder. Always search this tab's
         // document, rather than a field editor or another session's text view.
-        guard let session = current else { return }
+        guard let session = current, !session.isReadOnly else { return }
         if session.presentation?.kind == .csv {
             guard session.presentation?.setShowsStructure(false) == true else { return }
         }
@@ -357,6 +392,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         guard window?.attachedSheet == nil else { return false }
+        if current?.isReadOnly == true,
+           [#selector(saveDocument), #selector(saveDocumentAs), #selector(goToLine), #selector(changeLanguage(_:)),
+            #selector(performTextFinderAction(_:)), #selector(indentLines), #selector(unindentLines), #selector(toggleLineComment)].contains(item.action) {
+            return false
+        }
         if [#selector(indentLines), #selector(unindentLines), #selector(toggleLineComment)].contains(item.action) {
             guard let session = current, !session.lineEditPending, !session.textView.hasMarkedText(),
                   window.firstResponder === session.textView else { return false }
@@ -397,6 +437,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             button.bezelStyle = .rounded
             toolbar.addArrangedSubview(button)
             if action == #selector(reloadDocument) { reloadButton = button }
+            if action == #selector(saveDocument) { saveButton = button }
         }
         viewMode.segmentCount = 2
         viewMode.trackingMode = .selectOne
@@ -431,6 +472,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     private func addSession(_ session: EditorSession) {
         session.changed = { [weak self] in self?.refresh() }
+        session.startFileObservation()
         sessions.append(session)
         tabs.addTabViewItem(session.item)
         tabs.selectTabViewItem(session.item)
@@ -439,6 +481,8 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
+        for session in sessions where session !== current { session.presentation?.hidePreview() }
+        current?.presentation?.showPreviewIfNeeded()
         refresh()
         if let session = current { window?.makeFirstResponder(session.presentation?.preferredResponder) }
     }
@@ -447,13 +491,19 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         for session in sessions { session.item.label = session.name + (session.dirty ? " •" : "") }
         guard let session = current else { return }
         window?.title = L10n.format(.windowTitle, session.name, L10n.appName)
-        window?.representedURL = session.file?.url
+        window?.representedURL = session.documentURL
         window?.isDocumentEdited = session.dirty
-        reloadButton?.isEnabled = session.file != nil
+        reloadButton?.isEnabled = session.documentURL != nil
+        saveButton?.isEnabled = !session.isReadOnly
         viewMode.isHidden = session.presentation?.supportsStructure != true
         viewMode.setLabel(L10n.text(.sourceView), forSegment: 0)
         viewMode.setLabel(session.presentation?.structureTitle ?? "", forSegment: 1)
         viewMode.selectedSegment = session.presentation?.showsStructure == true ? 1 : 0
+        if session.isReadOnly {
+            status.stringValue = [L10n.text(.readOnlyPreview), session.documentURL?.path ?? ""].joined(separator: "  ·  ")
+            status.toolTip = status.stringValue
+            return
+        }
         var parts = [session.file?.encoding.displayName ?? "UTF-8", SyntaxHighlighter.languageName(for: session.file?.url, override: session.languageOverride)]
         if let index = session.lineRuler.currentIndex {
             switch index.newlineStyle {
@@ -475,7 +525,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         addSession(EditorSession())
     }
     @objc private func changeLanguage(_ sender: NSMenuItem) {
-        guard let session = current, window.attachedSheet == nil, !session.textView.hasMarkedText() else { return }
+        guard let session = current, !session.isReadOnly, window.attachedSheet == nil, !session.textView.hasMarkedText() else { return }
         session.languageOverride = SyntaxLanguage.allCases.indices.contains(sender.tag) ? SyntaxLanguage.allCases[sender.tag] : nil
     }
 
@@ -505,7 +555,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     @objc private func goToLine() {
-        guard let session = current, window.attachedSheet == nil, !session.textView.hasMarkedText(),
+        guard let session = current, !session.isReadOnly, window.attachedSheet == nil, !session.textView.hasMarkedText(),
               let index = session.lineRuler.currentIndex else { return }
         let revision = session.revision
         let alert = NSAlert()
@@ -541,19 +591,27 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     private func open(_ urls: [URL]) {
         for url in urls {
             let canonical = url.standardizedFileURL.resolvingSymlinksInPath()
-            if let existing = sessions.first(where: { $0.file?.url == canonical }) {
+            if let existing = sessions.first(where: { $0.documentURL == canonical }) {
                 tabs.selectTabViewItem(existing.item)
                 recentFiles.noteSuccessfulOpen(canonical)
                 continue
             }
             do {
-                let loaded = try DocumentFile.read(url)
-                if sessions.count == 1, let empty = sessions.first, empty.file == nil, empty.textView.string.isEmpty {
+                let session: EditorSession
+                switch try FileOpeningDecision.open(url) {
+                case .editable(let loaded): session = EditorSession(file: loaded)
+                case .preview(let url): session = EditorSession(readOnlyURL: url)
+                }
+                if sessions.count == 1, let empty = sessions.first, empty.documentURL == nil, empty.textView.string.isEmpty {
+                    empty.stopFileObservation()
+                    empty.lineRuler.invalidate()
+                    empty.decorations?.invalidate()
+                    empty.syntax.cancel()
                     tabs.removeTabViewItem(empty.item)
                     sessions.removeAll()
                 }
-                addSession(EditorSession(file: loaded))
-                recentFiles.noteSuccessfulOpen(loaded.url)
+                addSession(session)
+                recentFiles.noteSuccessfulOpen(canonical)
             } catch { showError(error) }
         }
     }
@@ -570,11 +628,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     private func save(_ session: EditorSession, saveAs: Bool) -> Bool {
-        guard window.attachedSheet == nil else { return false }
+        guard window.attachedSheet == nil, !session.isReadOnly else { return false }
         let chosen = saveAs || session.file == nil
         guard let url = chosen ? pickSaveURL(for: session) : session.file?.url else { return false }
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath()
-        if let other = sessions.first(where: { $0 !== session && $0.file?.url == canonical }) {
+        if let other = sessions.first(where: { $0 !== session && $0.documentURL == canonical }) {
             showMessage(L10n.text(.alreadyOpenTitle), L10n.format(.alreadyOpenMessage, other.name))
             return false
         }
@@ -603,6 +661,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     @objc private func reloadDocument() {
         guard window.attachedSheet == nil else { return }
+        if current?.isReadOnly == true { current?.presentation?.reloadPreview(); return }
         guard let session = current, let source = session.file?.url else { return }
         if session.dirty {
             let alert = NSAlert()
@@ -616,7 +675,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             case .alertThirdButtonReturn:
                 guard let copy = pickSaveURL(for: session, copy: true) else { return }
                 let canonical = copy.standardizedFileURL.resolvingSymlinksInPath()
-                guard canonical != source, !sessions.contains(where: { $0 !== session && $0.file?.url == canonical }) else {
+                guard canonical != source, !sessions.contains(where: { $0 !== session && $0.documentURL == canonical }) else {
                     showMessage(L10n.text(.copyLocationTitle), L10n.text(.copyLocationMessage))
                     return
                 }
@@ -628,23 +687,20 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             }
         }
         do {
-            // Load completely before replacing text: failure leaves the current buffer intact.
-            let loaded = try DocumentFile.read(source)
-            session.reload(loaded)
-            window.makeFirstResponder(session.presentation?.preferredResponder)
+            // Apply the same classification as Open before replacing text. A
+            // file that became binary/oversized must not enter an editable buffer.
+            switch try FileOpeningDecision.open(source) {
+            case .editable(let loaded):
+                session.reload(loaded)
+                window.makeFirstResponder(session.presentation?.preferredResponder)
+            case .preview:
+                showMessage(L10n.text(.readOnlyPreview), L10n.text(.reloadRequiresPreview))
+            }
         } catch { showError(error) }
     }
 
     private func checkDiskChanges() {
-        for session in sessions {
-            guard let check = session.beginDiskChangeCheck() else { continue }
-            DispatchQueue.global(qos: .utility).async { [weak session] in
-                let result = try? DocumentFile.read(check.file.url)
-                DispatchQueue.main.async {
-                    session?.finishDiskChangeCheck(check, result: result)
-                }
-            }
-        }
+        for session in sessions { session.fileObservation?.checkNow() }
     }
 
     private func confirmClose(_ session: EditorSession) -> Bool {
@@ -673,8 +729,10 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         guard let session = current else { return }
         if sessions.count == 1 { window.performClose(nil); return }
         guard confirmClose(session) else { return }
+        session.stopFileObservation()
         session.presentation?.cancel()
         session.lineRuler.invalidate()
+        session.decorations?.invalidate()
         session.syntax.cancel()
         sessions.removeAll { $0 === session }
         tabs.removeTabViewItem(session.item)

@@ -11,11 +11,12 @@ Folivyn is a personal project that is actively being improved. Feedback, bug rep
 - **Multiple tabs.** Keep files open together, with separate undo histories, selections, and scroll positions.
 - **Reload from disk.** Pick up changes made by other tools. If you have unsaved edits, cancel, discard them, or save a copy before reloading.
 - **Local syntax highlighting.** Read Python, Java, JavaScript, TypeScript, JSON, JSONC, and shell scripts with basic syntax colors. Other text formats open normally.
-- **Everyday code editing.** Logical line numbers, jump to line, per-tab language selection, multiline indentation, and line-comment toggling.
+- **Everyday code editing.** Logical line numbers, jump to line, per-tab language selection, multiline indentation, line-comment toggling, current-line shading, and bounded bracket hints.
 - **Find and replace.** Use the native find bar for literal search, next/previous matches, and replacement within the current tab.
 - **Finder Quick Look.** The bundled extension provides a read-only, syntax-colored source preview. Python and JSON have been verified through Finder's Space key; provider selection for other types depends on macOS and installed apps.
 - **CSV and TSV tables.** Read string-valued cells, choose comma or tab delimiters, use an optional display header, and edit one cell through the document's existing undo history.
 - **JSON navigation.** Browse a collapsible tree beside the source, search keys and values, and copy unambiguous JSON Pointers. Duplicate keys and original number spellings remain intact.
+- **Bounded file previews.** Larger files open with an explicit read-only prefix. Binary or invalid text receives a clear unavailable message and an optional default-app action.
 - **Careful file handling.** Preserve supported encodings, byte-order marks, and line endings. Check for external changes before saving and report conflicts.
 - **Fully offline.** Editing and highlighting work without an account, connection, or downloaded language packs. No telemetry or online services.
 - **Native and compact.** Built with Swift and AppKit, using macOS system frameworks and no third-party packages.
@@ -48,7 +49,7 @@ The script builds an arm64 release app and signs it locally. It selects `/Applic
 | Find selected text | `⌘E` |
 | Previous / next tab | `⇧⌘[` / `⇧⌘]` |
 
-A dot next to a tab's name indicates unsaved changes. The status bar shows its encoding, language, path, and any detected external changes. External files are checked when the app becomes active and before saving; reloading is manual.
+A dot next to a tab's name indicates unsaved changes. The status bar shows its encoding, language, path, and any detected external changes. Local file events update the external-change indicator, including atomic replacements. The app also checks when becoming active and before saving; reloading is manual.
 
 ### Languages
 
@@ -62,7 +63,7 @@ English is the default language. Simplified Chinese is included. The interface f
 - JSON trees support **1 MiB** of decoded UTF-8 text, **128 nested containers**, and **100,000 values**. Trees are read-only; edit the source to change JSON. Invalid or over-budget structures keep their source editable. JSONC remains source-only.
 - Quick Look reads at most **200 KiB** of encoded text or **2,000 lines**, marks truncated previews, and rejects invalid encoding or binary controls. It never edits or runs the file.
 
-Files with unsupported or invalid encodings are rejected without replacement decoding. Symbolic links are saved through to their targets; files with multiple hard links must be saved to a new location. Saving checks for external changes, but simultaneous writes by other processes can still race the final check and replacement.
+The main window also offers read-only previews bounded to **200 KiB** or **2,000 lines** for larger files. Preview tabs cannot be edited, saved, or saved as; Reload reads a new prefix. Binary or invalid text is shown as unavailable without replacement decoding. Symbolic links are saved through to their targets; files with multiple hard links must be saved to a new location. Saving checks for external changes, but simultaneous writes by other processes can still race the final check and replacement.
 
 ### Finder preview
 
@@ -96,7 +97,7 @@ The [structured-view validation record](docs/structured-views-validation.md) cov
 
 ## Roadmap
 
-Draft recovery, large-file read-only fallback, more editing tools, and validation are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
+Draft recovery, explicit text conversions, and further validation are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
 
 ## Contributing
 

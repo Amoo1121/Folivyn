@@ -133,6 +133,7 @@ final class ReadOnlyPreviewController: NSViewController {
     /// Call from a task owned by the host tab. Reading and metadata lookup happen
     /// off the main actor; cancellation never publishes a partial or stale result.
     func load(url: URL) async {
+        guard !Task.isCancelled else { return }
         cancelPendingRead()
         let expectedRevision = revision
         _ = view

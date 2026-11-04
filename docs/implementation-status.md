@@ -9,6 +9,20 @@ Finder's Space preview, fix defects, and continue implementing the design in
 small GitHub commits. The earlier native acceptance covered the existing P0
 text editor. It did not establish that Finder Quick Look or full V1 was complete.
 
+## Progress — 2026-11-04
+
+- F09/F16: main-window read-only fallback is integrated and exercised offline
+  with a 100 MiB file, binary controls, invalid UTF-8, reload and multiple tabs.
+  Prefix text never enters the editable buffer or Save/Save As path.
+- F10: file events are connected to sessions. Native frontmost-app checks show
+  ordinary writes and atomic replacement updating the warning while retaining
+  the local text. Save As rebinds the observation; closing stops it.
+- F06: current visual-line shading and bounded bracket hints are integrated;
+  native display and offscreen pixel/IME/undo checks are recorded.
+- F11: durable, bounded recovery storage has 22 focused Debug and Release tests,
+  including real child-process interruption. Recovery UI is still in progress.
+- Details and remaining limits: [Preview and observation validation](preview-validation.md).
+
 ## Progress after the baseline — 2026-11-03
 
 The tables below retain the historical baseline. Current progress superseding
