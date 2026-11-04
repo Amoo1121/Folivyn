@@ -14,8 +14,8 @@ public enum BracketMatcher {
         /// Double-quoted strings and JSON escapes are opaque; no comments exist.
         case json
         /// Common quoted spans and #, //, /* */ comments are opaque. This mode
-        /// deliberately declines ambiguous /, prefixed strings, interpolation,
-        /// heredocs, Unicode escapes, continued comments and nested comments.
+        /// deliberately declines ambiguous /, prefixed/hash-delimited strings,
+        /// interpolation, heredocs, Unicode escapes and continued/nested comments.
         /// This is a conservative generic aid, not exact language tokenization.
         case conservativeCode
     }
@@ -79,6 +79,18 @@ public enum BracketMatcher {
                 }
                 if unit == 35 || (unit == 47 && position + 1 < units.count && units[position + 1] == 47) {
                     let start = position
+                    if unit == 35 {
+                        // A hash run next to a quote could start a Swift/Rust
+                        // raw string. Treating its first line as a comment would
+                        // expose a multiline string's body as ordinary code.
+                        // The generic policy refuses this ambiguity; plain hash
+                        // comments still consume each character only once.
+                        repeat {
+                            try checkpoint(position)
+                            position += 1
+                        } while position < units.count && units[position] == 35
+                        if position < units.count, units[position] == 34 { throw unsupported(start) }
+                    }
                     while position < units.count, !isNewline(units[position]) {
                         try checkpoint(position)
                         // C-family line continuation and Unicode processing can

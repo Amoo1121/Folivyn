@@ -97,6 +97,70 @@ final class BracketMatcherTests: XCTestCase {
         }
     }
 
+    func testHashRawMultilineStringsRefuseHintsInsideAndAfterTheirBodies() throws {
+        let delimiters = [
+            ("#\"\"\"", "\"\"\"#"), ("##\"\"\"", "\"\"\"##"),
+            ("r#\"", "\"#"), ("br##\"", "\"##"), ("cr#\"", "\"#")
+        ]
+        for (opening, closing) in delimiters {
+            let source = "let 中文 = \(opening)\n🦊 () []\n\(closing);\nlet later = [0];"
+            let original = Array(source.utf16)
+            let body = (source as NSString).range(of: "()").location
+            let later = (source as NSString).range(of: "[0]").location
+            let firstHash = (source as NSString).range(of: "#").location
+            for caret in [body, body + 1, later, later + 2] {
+                XCTAssertThrowsError(try BracketMatcher.match(in: source, atUTF16Offset: caret,
+                                                             policy: .conservativeCode), opening) {
+                    XCTAssertEqual($0 as? BracketMatchError, .unsupportedSyntax(utf16Location: firstHash))
+                }
+            }
+            // Plain text deliberately treats those same brackets as literal.
+            XCTAssertEqual(try BracketMatcher.match(in: source, atUTF16Offset: body, policy: .literal),
+                           pair(body, body + 1))
+            XCTAssertEqual(Array(source.utf16), original)
+        }
+    }
+
+    func testOrdinaryPythonAndShellHashCommentsStillAllowFollowingCodeHints() throws {
+        let sources = [
+            "# Python comment with () and \"quotes\"\n(value)",
+            "# \"quoted prefix\" is still a comment\n(value)",
+            "#!/bin/sh\r\n# shell comment { [ (\r\n(value)",
+            "### heading with \"quotes\" ()\r(value)",
+            "#\n(value)"
+        ]
+        for source in sources {
+            let opening = (source as NSString).range(of: "(value)").location
+            for caret in [opening, opening + 6] {
+                XCTAssertEqual(try BracketMatcher.match(in: source, atUTF16Offset: caret,
+                                                       policy: .conservativeCode), pair(opening, opening + 6), source)
+            }
+            let commentBracket = (source as NSString).range(of: "()").location
+            if commentBracket != NSNotFound {
+                XCTAssertNil(try BracketMatcher.match(in: source, atUTF16Offset: commentBracket,
+                                                      policy: .conservativeCode), source)
+            }
+        }
+    }
+
+    func testLongHashPrefixRefusalRemainsCancellableAndBounded() {
+        let source = String(repeating: "#", count: 2_998) + "\"\n()\n\""
+        let caret = (source as NSString).range(of: "()").location
+        XCTAssertThrowsError(try BracketMatcher.match(in: source, atUTF16Offset: caret,
+                                                     policy: .conservativeCode)) {
+            XCTAssertEqual($0 as? BracketMatchError, .unsupportedSyntax(utf16Location: 0))
+        }
+        let counter = BracketCancellationCounter(threshold: 8)
+        XCTAssertThrowsError(try BracketMatcher.match(in: source, atUTF16Offset: caret,
+                                                     policy: .conservativeCode, isCancelled: { counter.check() })) {
+            XCTAssertTrue($0 is CancellationError)
+        }
+        XCTAssertThrowsError(try BracketMatcher.match(in: source, atUTF16Offset: 0,
+                                                     policy: .conservativeCode, limits: .init(maximumUTF16Units: 2_048))) {
+            XCTAssertEqual($0 as? BracketMatchError, .inputTooLarge(limit: 2_048))
+        }
+    }
+
     func testUnmatchedAndCrossedBracketsDoNotInventPairs() throws {
         for source in ["(", ")", "([)]", "{]}", "{[(]}"] {
             XCTAssertNil(try BracketMatcher.match(in: source, atUTF16Offset: 0), source)
