@@ -7,7 +7,7 @@ extension EditorSession {
     var lineCommentPrefix: String? {
         switch languageOverride ?? SyntaxLanguage.forFile(file?.url) ?? .plainText {
         case .python, .shell: return "#"
-        case .java, .javascript, .typescript, .jsonWithComments: return "//"
+        case .java, .javascript, .typescript, .jsonWithComments, .swift, .c, .cpp, .go, .rust: return "//"
         case .plainText, .json: return nil
         }
     }

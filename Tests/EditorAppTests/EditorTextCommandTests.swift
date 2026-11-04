@@ -42,6 +42,10 @@ final class EditorTextCommandTests: XCTestCase {
         XCTAssertEqual(session.lineCommentPrefix, "//")
         session.languageOverride = .python
         XCTAssertEqual(session.lineCommentPrefix, "#")
+        for language in [SyntaxLanguage.swift, .c, .cpp, .go, .rust] {
+            session.languageOverride = language
+            XCTAssertEqual(session.lineCommentPrefix, "//")
+        }
         session.textView.setMarkedText("中", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: 0, length: 0))
         let result = try await session.applyLineOperation(.indent(unit: "    "), actionName: "Indent")
         XCTAssertFalse(result)

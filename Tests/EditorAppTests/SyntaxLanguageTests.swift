@@ -28,7 +28,10 @@ final class SyntaxLanguageTests: XCTestCase {
             ("a.json", .json), ("a.jsonc", .jsonWithComments), ("a.PY", .python),
             ("a.pyw", .python), ("a.java", .java), ("a.jsx", .javascript),
             ("a.mjs", .javascript), ("a.tsx", .typescript), ("a.cts", .typescript),
-            ("a.sh", .shell), (".zshrc", .shell)
+            ("a.sh", .shell), (".zshrc", .shell), ("a.swift", .swift),
+            ("a.c", .c), ("a.h", .c), ("a.C", .cpp), ("a.cpp", .cpp),
+            ("a.cc", .cpp), ("a.cxx", .cpp), ("a.hpp", .cpp), ("a.ipp", .cpp),
+            ("a.go", .go), ("a.rs", .rust)
         ]
         for (name, language) in cases {
             let url = URL(fileURLWithPath: "/fixtures/" + name)
