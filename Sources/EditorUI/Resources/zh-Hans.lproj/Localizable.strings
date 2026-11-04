@@ -149,3 +149,22 @@
 "preview.displayed_bytes" = "已显示文本：%d 字节（不含 BOM）";
 
 "preview.reload_requires_preview" = "此文件现在需要只读预览。当前正文已保留，请关闭此标签页后重新打开文件进行预览。";
+
+"recovery.open" = "恢复草稿…";
+"recovery.title" = "草稿恢复";
+"recovery.name" = "已恢复 — %@";
+"recovery.finishing" = "正在完成草稿恢复清理…";
+"recovery.quit_failed" = "无法完成恢复副本清理。应用保持打开，并保留你的草稿，请稍后重试退出。";
+"recovery.unavailable" = "草稿恢复需要处理";
+"recovery.unavailable_message" = "无法完成草稿恢复。已打开的文档保持不变，无法读取或尚未恢复的副本已保留；可从“文件 → 恢复草稿”重试。";
+"recovery.none" = "没有可恢复的非活动草稿。";
+"recovery.restore_all" = "全部恢复";
+"recovery.later" = "稍后处理";
+"recovery.discard" = "丢弃恢复副本";
+"recovery.name_column" = "草稿";
+"recovery.updated_column" = "恢复快照时间";
+"recovery.no_readable" = "没有可读取的恢复草稿。";
+"recovery.discard_explanation" = "丢弃只删除列表中的恢复副本，不会更改原文件。";
+"recovery.summary" = "发现 %ld 份草稿。恢复将打开独立的未保存标签，不会覆盖原文件。";
+"recovery.unreadable_count" = "另有 %ld 个无法读取的恢复项，已保留供检查。";
+"recovery.too_many" = "一次最多显示 %ld 份草稿。恢复副本保持不变。";

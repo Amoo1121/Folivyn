@@ -19,8 +19,10 @@ text editor. It did not establish that Finder Quick Look or full V1 was complete
   the local text. Save As rebinds the observation; closing stops it.
 - F06: current visual-line shading and bounded bracket hints are integrated;
   native display and offscreen pixel/IME/undo checks are recorded.
-- F11: durable, bounded recovery storage has 22 focused Debug and Release tests,
-  including real child-process interruption. Recovery UI is still in progress.
+- F11: startup recovery, deferred recovery, independent unsaved tabs, encoding
+  hints and close cleanup are integrated. Native offline process-kill/restart,
+  changed original files, empty UTF-16 drafts and multi-tab quit cancellation
+  pass. See [Recovery validation](recovery-validation.md) for limits and evidence.
 - Details and remaining limits: [Preview and observation validation](preview-validation.md).
 
 ## Progress after the baseline — 2026-11-03

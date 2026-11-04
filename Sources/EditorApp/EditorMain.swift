@@ -20,7 +20,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         let file: LoadedTextFile
     }
 
-    let id = UUID()
+    let id: UUID
     let textView = FolivynTextView(usingTextLayoutManager: true)
     let scrollView = NSScrollView()
     let item = NSTabViewItem()
@@ -46,12 +46,22 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     var diskChanged = false
     var changed: (() -> Void)?
     var sourceChanged: (() -> Void)?
+    var recoveryChanged: (() -> Void)?
+    private(set) var recoveryOriginPath: String?
+    private(set) var recoveryEncoding: TextFileEncoding?
+    private var recoveredUnsaved = false
     private(set) var revision: UInt64 = 0
     private var diskCheckGeneration: UInt64 = 0
-    var dirty: Bool { !isReadOnly && !textView.string.utf16.elementsEqual(baseline.utf16) }
-    var name: String { documentURL?.lastPathComponent ?? L10n.text(.untitled) }
+    var dirty: Bool { !isReadOnly && (recoveredUnsaved || !textView.string.utf16.elementsEqual(baseline.utf16)) }
+    var name: String {
+        if let documentURL { return documentURL.lastPathComponent }
+        if recoveredUnsaved { return L10n.format(.recoveredName, recoveryOriginPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? L10n.text(.untitled)) }
+        return L10n.text(.untitled)
+    }
+    var saveEncoding: TextFileEncoding { file?.encoding ?? recoveryEncoding ?? .utf8 }
 
-    init(file: LoadedTextFile? = nil, readOnlyURL: URL? = nil) {
+    init(id: UUID = UUID(), file: LoadedTextFile? = nil, readOnlyURL: URL? = nil) {
+        self.id = id
         self.readOnlyURL = readOnlyURL
         super.init()
         self.file = readOnlyURL == nil ? file : nil
@@ -122,7 +132,34 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         decorations?.refresh()
         lineRuler.refresh()
         sourceChanged?()
+        recoveryChanged?()
         changed?()
+    }
+
+    /// Recovery always creates an independent unsaved document. The origin is
+    /// a display hint, never a file URL or an authority to overwrite that path.
+    convenience init(recovered snapshot: DraftRecoverySnapshot) {
+        self.init(id: snapshot.documentID)
+        recoveryOriginPath = snapshot.originPath
+        recoveryEncoding = snapshot.encodingHint
+        recoveredUnsaved = true
+        textView.string = snapshot.text
+        revision &+= 1
+        let count = snapshot.text.utf16.count
+        let location = min(max(0, snapshot.selection.location), count)
+        textView.setSelectedRange(NSRange(location: location, length: min(max(0, snapshot.selection.length), count - location)))
+        undoStack.removeAllActions()
+        languageOverride = snapshot.originPath.flatMap { SyntaxLanguage.forFile(URL(fileURLWithPath: $0)) }
+        lineRuler.refresh()
+        decorations?.refresh()
+        item.label = name
+    }
+
+    var recoveryContent: DraftRecoveryContent? {
+        guard !isReadOnly, dirty, !textView.hasMarkedText() else { return nil }
+        let selection = textView.selectedRange()
+        return DraftRecoveryContent(text: textView.string, originPath: file?.url.path ?? recoveryOriginPath,
+            encodingHint: saveEncoding, selection: .init(location: selection.location, length: selection.length))
     }
 
     /// Every derived view applies one local edit to this sole source buffer.
@@ -189,11 +226,15 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         diskCheckGeneration &+= 1
         file = loaded
         baseline = loaded.text
+        recoveredUnsaved = false
+        recoveryOriginPath = nil
+        recoveryEncoding = nil
         diskChanged = false
         syntax.highlight(textView: textView, fileURL: loaded.url, override: languageOverride)
         decorations?.refresh()
         presentation?.configure()
         fileObservation?.updateURL()
+        recoveryChanged?()
         changed?()
     }
 
@@ -250,6 +291,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     private var saveButton: NSButton!
     private let viewMode = NSSegmentedControl()
     private var mayTerminate = false
+    private var terminationPending = false
+    private var recoveryOperationPending = false
+    private var recovery: DraftRecoveryCoordinator?
+    private var recoveryIssues = Set<UUID>()
+    private var recoveryGeneralIssue = false
     private var pendingURLs: [URL] = []
     private var recentFiles: RecentFilesCoordinator!
 
@@ -265,6 +311,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         if sessions.isEmpty { addSession(EditorSession()) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        setUpRecovery()
     }
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {
@@ -283,13 +330,44 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     func applicationDidBecomeActive(_ notification: Notification) { checkDiskChanges() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard window?.attachedSheet == nil else { return .terminateCancel }
-        return (mayTerminate || confirmCloseAll()) ? .terminateNow : .terminateCancel
+        guard !terminationPending, !recoveryOperationPending, window?.attachedSheet == nil else { return .terminateCancel }
+        guard mayTerminate || confirmCloseAll() else { return .terminateCancel }
+        guard let recovery else { return .terminateNow }
+        terminationPending = true
+        // Clear only after every close decision was accepted. A later Cancel in
+        // confirmCloseAll must leave earlier tabs' recovery snapshots available.
+        for session in sessions { recovery.clear(documentID: session.id) }
+        let progress = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 76), styleMask: [.titled], backing: .buffered, defer: false)
+        let label = NSTextField(labelWithString: L10n.text(.recoveryFinishing))
+        label.frame = NSRect(x: 20, y: 24, width: 320, height: 24)
+        progress.contentView?.addSubview(label)
+        window.beginSheet(progress)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await recovery.flush(timeout: .seconds(3))
+            switch result {
+            case .completed:
+                _ = await recovery.finish(timeout: .seconds(3))
+                window.endSheet(progress)
+                progress.orderOut(nil)
+                mayTerminate = true
+                NSApp.reply(toApplicationShouldTerminate: true)
+            case .failed, .timedOut:
+                window.endSheet(progress)
+                progress.orderOut(nil)
+                terminationPending = false
+                for session in sessions where session.dirty { recovery.schedule(documentID: session.id) }
+                NSApp.reply(toApplicationShouldTerminate: false)
+                showMessage(L10n.text(.recoveryTitle), L10n.text(.recoveryQuitFailed))
+            }
+        }
+        return .terminateLater
     }
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        guard sender.attachedSheet == nil else { return false }
-        mayTerminate = confirmCloseAll()
-        return mayTerminate
+        if mayTerminate { return true }
+        guard sender.attachedSheet == nil, !terminationPending, !recoveryOperationPending else { return false }
+        NSApp.terminate(nil)
+        return false
     }
 
     private func installMenu() {
@@ -310,6 +388,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
                 self.open([url])
             })
         addMenu(L10n.text(.openRecent), menu: recentFiles.menu, to: file)
+        addAction(L10n.text(.recoverDrafts), #selector(recoverDrafts), "", to: file)
         file.addItem(.separator())
         addAction(L10n.text(.save), #selector(saveDocument), "s", to: file)
         addAction(L10n.text(.saveAs), #selector(saveDocumentAs), "s", modifiers: [.command, .shift], to: file)
@@ -391,7 +470,8 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        guard window?.attachedSheet == nil else { return false }
+        guard !terminationPending, window?.attachedSheet == nil else { return false }
+        if item.action == #selector(recoverDrafts) { return !recoveryOperationPending }
         if current?.isReadOnly == true,
            [#selector(saveDocument), #selector(saveDocumentAs), #selector(goToLine), #selector(changeLanguage(_:)),
             #selector(performTextFinderAction(_:)), #selector(indentLines), #selector(unindentLines), #selector(toggleLineComment)].contains(item.action) {
@@ -472,6 +552,11 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     private func addSession(_ session: EditorSession) {
         session.changed = { [weak self] in self?.refresh() }
+        session.recoveryChanged = { [weak self, weak session] in
+            guard let self, let session, !session.isReadOnly else { return }
+            if session.dirty { recovery?.schedule(documentID: session.id) }
+            else { recovery?.clear(documentID: session.id) }
+        }
         session.startFileObservation()
         sessions.append(session)
         tabs.addTabViewItem(session.item)
@@ -504,7 +589,8 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             status.toolTip = status.stringValue
             return
         }
-        var parts = [session.file?.encoding.displayName ?? "UTF-8", SyntaxHighlighter.languageName(for: session.file?.url, override: session.languageOverride)]
+        var parts = [session.saveEncoding.displayName, SyntaxHighlighter.languageName(for: session.file?.url, override: session.languageOverride)]
+        if recoveryGeneralIssue || recoveryIssues.contains(session.id) { parts.append(L10n.text(.recoveryUnavailable)) }
         if let index = session.lineRuler.currentIndex {
             switch index.newlineStyle {
             case .none: parts.append(L10n.text(.noLineEndings))
@@ -602,7 +688,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
                 case .editable(let loaded): session = EditorSession(file: loaded)
                 case .preview(let url): session = EditorSession(readOnlyURL: url)
                 }
-                if sessions.count == 1, let empty = sessions.first, empty.documentURL == nil, empty.textView.string.isEmpty {
+                if sessions.count == 1, let empty = sessions.first, !empty.dirty, empty.documentURL == nil, empty.textView.string.isEmpty {
                     empty.stopFileObservation()
                     empty.lineRuler.invalidate()
                     empty.decorations?.invalidate()
@@ -621,7 +707,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     private func pickSaveURL(for session: EditorSession, copy: Bool = false) -> URL? {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = session.file?.url.lastPathComponent ?? "Untitled.txt"
+        panel.nameFieldStringValue = session.file?.url.lastPathComponent ?? (session.recoveryOriginPath != nil ? session.name : "Untitled.txt")
         panel.directoryURL = session.file?.url.deletingLastPathComponent()
         panel.title = copy ? L10n.text(.saveCopyTitle) : L10n.text(.saveTitle)
         return panel.runModal() == .OK ? panel.url : nil
@@ -639,7 +725,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         let sameFile = canonical == session.file?.url
         do {
             let saved = try DocumentFile.save(session.textView.string, to: url,
-                encoding: session.file?.encoding ?? .utf8,
+                encoding: session.saveEncoding,
                 expectedSnapshot: sameFile ? session.file?.diskSnapshot : nil,
                 overwriteExternalChanges: chosen && !sameFile)
             session.acceptSaved(saved)
@@ -681,7 +767,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
                 }
                 do {
                     _ = try DocumentFile.save(session.textView.string, to: copy,
-                        encoding: session.file?.encoding ?? .utf8, overwriteExternalChanges: true)
+                        encoding: session.saveEncoding, overwriteExternalChanges: true)
                 } catch { showError(error); return }
             default: return
             }
@@ -701,6 +787,77 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     private func checkDiskChanges() {
         for session in sessions { session.fileObservation?.checkNow() }
+    }
+
+    private func setUpRecovery() {
+        do {
+            // An explicit test directory isolates process-kill acceptance runs
+            // from the user's real drafts. The store applies the same safety checks.
+            let directory: URL
+            if let path = ProcessInfo.processInfo.environment["FOLIVYN_RECOVERY_DIRECTORY"] {
+                directory = URL(fileURLWithPath: path, isDirectory: true)
+            } else {
+                directory = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                    appropriateFor: nil, create: true).appendingPathComponent("Folivyn/Recovery", isDirectory: true)
+            }
+            let store = try DraftRecoveryStore(directory: directory)
+            recoveryGeneralIssue = false
+            recovery = DraftRecoveryCoordinator(store: store, snapshotProvider: { [weak self] id in
+                self?.sessions.first { $0.id == id }?.recoveryContent
+            }, onEvent: { [weak self] event in
+                guard let self else { return }
+                switch event {
+                case .issue(let issue):
+                    if let id = issue.documentID { recoveryIssues.insert(id) }
+                    else { recoveryGeneralIssue = true }
+                case .persisted(let id, _), .cleared(let id, _): recoveryIssues.remove(id)
+                case .closed: break
+                }
+                refresh()
+            })
+            requestRecoveryPrompt(manual: false)
+        } catch {
+            recoveryGeneralIssue = true
+            refresh()
+            showMessage(L10n.text(.recoveryTitle), L10n.text(.recoveryUnavailableMessage))
+        }
+    }
+
+    @objc private func recoverDrafts() {
+        if recovery == nil { setUpRecovery() }
+        else { requestRecoveryPrompt(manual: true) }
+    }
+
+    private func requestRecoveryPrompt(manual: Bool) {
+        guard let recovery, !terminationPending, !recoveryOperationPending, window.attachedSheet == nil else { return }
+        recoveryOperationPending = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { recoveryOperationPending = false }
+            do {
+                let scan = try await recovery.scan()
+                guard !terminationPending, window.attachedSheet == nil, NSApp.modalWindow == nil else { return }
+                if scan.drafts.isEmpty && scan.issues.isEmpty {
+                    if manual { showMessage(L10n.text(.recoveryTitle), L10n.text(.recoveryNone)) }
+                    return
+                }
+                switch RecoveryPrompt.present(drafts: scan.drafts, issueCount: scan.issues.count, strings: RecoveryStrings.make()) {
+                case .later: break
+                case .restoreAll:
+                    for draft in scan.drafts {
+                        let claimed = try await recovery.claim(draft, as: UUID())
+                        let session = EditorSession(recovered: claimed.snapshot)
+                        addSession(session)
+                    }
+                case .discardRecoveredDrafts:
+                    for draft in scan.drafts { try await recovery.discardRecovered(draft.reference) }
+                }
+            } catch {
+                recoveryGeneralIssue = true
+                refresh()
+                showMessage(L10n.text(.recoveryTitle), L10n.text(.recoveryUnavailableMessage))
+            }
+        }
     }
 
     private func confirmClose(_ session: EditorSession) -> Bool {
@@ -729,6 +886,8 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         guard let session = current else { return }
         if sessions.count == 1 { window.performClose(nil); return }
         guard confirmClose(session) else { return }
+        recovery?.clear(documentID: session.id)
+        session.recoveryChanged = nil
         session.stopFileObservation()
         session.presentation?.cancel()
         session.lineRuler.invalidate()

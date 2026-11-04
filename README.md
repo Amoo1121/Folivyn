@@ -16,6 +16,7 @@ Folivyn is a personal project that is actively being improved. Feedback, bug rep
 - **Finder Quick Look.** The bundled extension provides a read-only, syntax-colored source preview. Python and JSON have been verified through Finder's Space key; provider selection for other types depends on macOS and installed apps.
 - **CSV and TSV tables.** Read string-valued cells, choose comma or tab delimiters, use an optional display header, and edit one cell through the document's existing undo history.
 - **JSON navigation.** Browse a collapsible tree beside the source, search keys and values, and copy unambiguous JSON Pointers. Duplicate keys and original number spellings remain intact.
+- **Local draft recovery.** Periodic snapshots of unsaved text can be restored as independent tabs after an interrupted session, without overwriting the original files.
 - **Bounded file previews.** Larger files open with an explicit read-only prefix. Binary or invalid text receives a clear unavailable message and an optional default-app action.
 - **Careful file handling.** Preserve supported encodings, byte-order marks, and line endings. Check for external changes before saving and report conflicts.
 - **Fully offline.** Editing and highlighting work without an account, connection, or downloaded language packs. No telemetry or online services.
@@ -81,6 +82,21 @@ File > Open Recent reopens successfully read files. Drop local regular files int
 
 Use `⌘L` to jump to a logical line; soft wrapping does not add line numbers. The status bar reports existing line endings without converting them. Edit > Language overrides filename detection for the current tab, including an explicit Plain text option. `⌘]` / `⌘[` add / remove four-space indentation, and `⌘/` toggles the language's line comment. JSON and plain text do not guess a comment syntax.
 
+### Draft recovery
+
+Unsaved text is snapshotted locally after about 750 ms without an edit, with a
+5-second maximum batching window while typing. The next launch offers Restore
+All, Later, or Discard Recovered Drafts; File > Recover Drafts can reopen the list.
+Restored tabs are unsaved copies and always ask for a save location. The original
+path and encoding are hints only. Empty edited files are recoverable too.
+
+Snapshots use a private directory under `~/Library/Application Support/Folivyn/Recovery`.
+The store is bounded to 32 MiB per snapshot, 256 MiB total, and 128 drafts. Saving,
+reloading, or explicitly closing a document clears its recovery copy. Cancelling
+a multi-tab quit retains the drafts. Recent keystrokes, unfinished input-method
+composition, and unapplied CSV cell drafts may not have reached a snapshot;
+recovery is not a substitute for Save or a guarantee against storage failure.
+
 ## Development
 
 Run the file-handling, editing-session, and localization tests:
@@ -97,7 +113,7 @@ The [structured-view validation record](docs/structured-views-validation.md) cov
 
 ## Roadmap
 
-Draft recovery, explicit text conversions, and further validation are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
+Explicit text conversions and further validation are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
 
 ## Contributing
 

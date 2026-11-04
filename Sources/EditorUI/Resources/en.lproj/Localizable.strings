@@ -149,3 +149,22 @@
 "preview.displayed_bytes" = "Displayed text: %d bytes (excluding BOM)";
 
 "preview.reload_requires_preview" = "This file now requires a read-only preview. Your current text has been kept. Close this tab and reopen the file to preview it.";
+
+"recovery.open" = "Recover Drafts…";
+"recovery.title" = "Draft recovery";
+"recovery.name" = "Recovered — %@";
+"recovery.finishing" = "Finishing draft recovery…";
+"recovery.quit_failed" = "Recovery cleanup could not finish. The app remains open and your drafts are retained. Please try quitting again.";
+"recovery.unavailable" = "Draft recovery needs attention";
+"recovery.unavailable_message" = "Draft recovery could not complete. Your open documents are unchanged. Unreadable or unclaimed recovery files have been kept; you can retry from File > Recover Drafts.";
+"recovery.none" = "No inactive drafts are available to recover.";
+"recovery.restore_all" = "Restore All";
+"recovery.later" = "Later";
+"recovery.discard" = "Discard Recovered Drafts";
+"recovery.name_column" = "Draft";
+"recovery.updated_column" = "Saved recovery snapshot";
+"recovery.no_readable" = "No readable recovery drafts.";
+"recovery.discard_explanation" = "Discard removes the listed recovery copies. It does not change their original files.";
+"recovery.summary" = "%ld drafts are available. Restore opens independent unsaved tabs; it never overwrites their original files.";
+"recovery.unreadable_count" = "%ld unreadable recovery items were kept for inspection.";
+"recovery.too_many" = "Only %ld drafts can be displayed at once. Recovery copies are kept unchanged.";
