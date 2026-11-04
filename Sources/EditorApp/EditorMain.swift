@@ -21,11 +21,16 @@ final class EditorSession: NSObject, NSTextViewDelegate {
     }
 
     let id = UUID()
-    let textView = NSTextView(usingTextLayoutManager: true)
+    let textView = FolivynTextView(usingTextLayoutManager: true)
     let scrollView = NSScrollView()
     let item = NSTabViewItem()
     let syntax = SyntaxHighlighter()
     let undoStack = UndoManager()
+    var lineEditPending = false
+    private(set) var lineRuler: LineNumberRuler!
+    var languageOverride: SyntaxLanguage? {
+        didSet { syntax.highlight(textView: textView, fileURL: file?.url, override: languageOverride); changed?() }
+    }
     private(set) var presentation: DocumentPresentation?
     var file: LoadedTextFile?
     var baseline = ""
@@ -75,17 +80,27 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         scrollView.documentView = textView
         scrollView.autoresizingMask = [.width, .height]
         textView.string = baseline
+        lineRuler = LineNumberRuler(textView: textView, snapshot: { [weak self] in
+            guard let self else { return ("", 0) }
+            return (self.textView.string, self.revision)
+        })
+        scrollView.verticalRulerView = lineRuler
+        scrollView.hasVerticalRuler = true
+        scrollView.rulersVisible = true
+        lineRuler.onIndexChange = { [weak self] in self?.changed?() }
+        lineRuler.refresh()
         item.identifier = id
         presentation = DocumentPresentation(session: self)
         item.view = presentation?.view
         sourceChanged = { [weak self] in self?.presentation?.sourceDidChange() }
         item.label = name
-        syntax.highlight(textView: textView, fileURL: file?.url)
+        syntax.highlight(textView: textView, fileURL: file?.url, override: languageOverride)
     }
 
     func textDidChange(_ notification: Notification) {
         revision &+= 1
-        syntax.highlight(textView: textView, fileURL: file?.url)
+        syntax.highlight(textView: textView, fileURL: file?.url, override: languageOverride)
+        lineRuler.refresh()
         sourceChanged?()
         changed?()
     }
@@ -135,6 +150,18 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         presentation?.sourceSelectionDidChange()
     }
 
+    @discardableResult
+    func goToLine(_ line: Int) -> Bool {
+        guard !textView.hasMarkedText(), presentation?.csv?.hasPendingCellEdit != true,
+              lineRuler.displayedRevision == revision,
+              let range = lineRuler.currentIndex?.insertionRange(forLine: line) else { return false }
+        if presentation?.kind == .csv, presentation?.setShowsStructure(false) != true { return false }
+        textView.setSelectedRange(range)
+        textView.scrollRangeToVisible(range)
+        textView.window?.makeFirstResponder(textView)
+        return true
+    }
+
     func acceptSaved(_ loaded: LoadedTextFile) {
         // Invalidate checks started before a save or reload, even when the
         // resulting bytes happen to match the previous baseline.
@@ -142,7 +169,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         file = loaded
         baseline = loaded.text
         diskChanged = false
-        syntax.highlight(textView: textView, fileURL: loaded.url)
+        syntax.highlight(textView: textView, fileURL: loaded.url, override: languageOverride)
         presentation?.configure()
         changed?()
     }
@@ -167,6 +194,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
         textView.unmarkText()
         textView.string = loaded.text
         revision &+= 1
+        lineRuler.refresh()
         sourceChanged?()
         undoStack.removeAllActions()
         let count = (loaded.text as NSString).length
@@ -180,7 +208,7 @@ final class EditorSession: NSObject, NSTextViewDelegate {
 
 @MainActor
 final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTabViewDelegate, NSUserInterfaceValidations {
-    private var window: NSWindow!
+    private var window: FolivynWindow!
     private let tabs = NSTabView()
     private let status = NSTextField(labelWithString: "")
     private var sessions: [EditorSession] = []
@@ -188,6 +216,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     private let viewMode = NSSegmentedControl()
     private var mayTerminate = false
     private var pendingURLs: [URL] = []
+    private var recentFiles: RecentFilesCoordinator!
 
     private var current: EditorSession? {
         sessions.first { $0.id == tabs.selectedTabViewItem?.identifier as? UUID }
@@ -239,6 +268,13 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         let file = NSMenu(title: L10n.text(.fileMenu))
         addAction(L10n.text(.new), #selector(newDocument), "n", to: file)
         addAction(L10n.text(.open), #selector(openDocument), "o", to: file)
+        recentFiles = RecentFilesCoordinator(strings: RecentFilesStrings(
+            menuTitle: L10n.text(.openRecent), empty: L10n.text(.noRecentFiles), clear: L10n.text(.clearRecentFiles)),
+            onOpen: { [weak self] url in
+                guard let self, self.window?.attachedSheet == nil, NSApp.modalWindow == nil else { return }
+                self.open([url])
+            })
+        addMenu(L10n.text(.openRecent), menu: recentFiles.menu, to: file)
         file.addItem(.separator())
         addAction(L10n.text(.save), #selector(saveDocument), "s", to: file)
         addAction(L10n.text(.saveAs), #selector(saveDocumentAs), "s", modifiers: [.command, .shift], to: file)
@@ -262,6 +298,22 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         addFindAction(.findNext, .nextMatch, "g", to: edit)
         addFindAction(.findPrevious, .previousMatch, "g", modifiers: [.command, .shift], to: edit)
         addFindAction(.useSelectionForFind, .setSearchString, "e", to: edit)
+        addAction(L10n.text(.goToLine), #selector(goToLine), "l", to: edit)
+        let languages = NSMenu(title: L10n.text(.language))
+        let automatic = languages.addItem(withTitle: L10n.text(.automaticLanguage), action: #selector(changeLanguage(_:)), keyEquivalent: "")
+        automatic.target = self
+        automatic.tag = -1
+        languages.addItem(.separator())
+        for (index, language) in SyntaxLanguage.allCases.enumerated() {
+            let item = languages.addItem(withTitle: language.displayName, action: #selector(changeLanguage(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+        }
+        addMenu(L10n.text(.language), menu: languages, to: edit)
+        edit.addItem(.separator())
+        addAction(L10n.text(.indent), #selector(indentLines), "]", to: edit)
+        addAction(L10n.text(.unindent), #selector(unindentLines), "[", to: edit)
+        addAction(L10n.text(.toggleLineComment), #selector(toggleLineComment), "/", to: edit)
         addMenu(L10n.text(.editMenu), menu: edit, to: bar)
 
         let view = NSMenu(title: L10n.text(.tabsMenu))
@@ -305,6 +357,19 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
 
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         guard window?.attachedSheet == nil else { return false }
+        if [#selector(indentLines), #selector(unindentLines), #selector(toggleLineComment)].contains(item.action) {
+            guard let session = current, !session.lineEditPending, !session.textView.hasMarkedText(),
+                  window.firstResponder === session.textView else { return false }
+            return item.action != #selector(toggleLineComment) || session.lineCommentPrefix != nil
+        }
+        if item.action == #selector(goToLine) {
+            return current?.lineRuler.currentIndex != nil && current?.textView.hasMarkedText() == false
+        }
+        if item.action == #selector(changeLanguage(_:)), let item = item as? NSMenuItem {
+            let chosen = current?.languageOverride.flatMap { SyntaxLanguage.allCases.firstIndex(of: $0) } ?? -1
+            item.state = item.tag == chosen ? .on : .off
+            return current?.textView.hasMarkedText() == false
+        }
         if item.action == #selector(performTextFinderAction(_:)) {
             return current?.textView.validateUserInterfaceItem(item) ?? false
         }
@@ -312,12 +377,14 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     private func createWindow() {
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 980, height: 680),
+        window = FolivynWindow(contentRect: NSRect(x: 0, y: 0, width: 980, height: 680),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable],
                           backing: .buffered, defer: false)
         window.title = L10n.appName
         window.minSize = NSSize(width: 600, height: 380)
         window.delegate = self
+        window.onOpenURLs = { [weak self] in self?.open($0) }
+        window.canOpenDroppedFiles = { [weak self] in self?.current?.textView.hasMarkedText() != true }
         window.isReleasedWhenClosed = false
         window.center()
         let content = window.contentView!
@@ -387,7 +454,14 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         viewMode.setLabel(L10n.text(.sourceView), forSegment: 0)
         viewMode.setLabel(session.presentation?.structureTitle ?? "", forSegment: 1)
         viewMode.selectedSegment = session.presentation?.showsStructure == true ? 1 : 0
-        var parts = [session.file?.encoding.displayName ?? "UTF-8", SyntaxHighlighter.languageName(for: session.file?.url)]
+        var parts = [session.file?.encoding.displayName ?? "UTF-8", SyntaxHighlighter.languageName(for: session.file?.url, override: session.languageOverride)]
+        if let index = session.lineRuler.currentIndex {
+            switch index.newlineStyle {
+            case .none: parts.append(L10n.text(.noLineEndings))
+            case .mixed: parts.append(L10n.text(.mixedLineEndings))
+            default: parts.append(index.newlineStyle.rawValue)
+            }
+        } else if session.lineRuler.lastError != nil { parts.append(L10n.text(.lineIndexUnavailable)) }
         if session.syntax.isLimited { parts.append(L10n.text(.largeText)) }
         if session.dirty { parts.append(L10n.text(.unsaved)) }
         if session.diskChanged { parts.append(L10n.text(.diskChanged)) }
@@ -399,6 +473,57 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     @objc private func newDocument() {
         guard window.attachedSheet == nil else { return }
         addSession(EditorSession())
+    }
+    @objc private func changeLanguage(_ sender: NSMenuItem) {
+        guard let session = current, window.attachedSheet == nil, !session.textView.hasMarkedText() else { return }
+        session.languageOverride = SyntaxLanguage.allCases.indices.contains(sender.tag) ? SyntaxLanguage.allCases[sender.tag] : nil
+    }
+
+    @objc private func indentLines() { applyLineOperation(.indent(unit: "    "), name: .indent) }
+    @objc private func unindentLines() { applyLineOperation(.unindent(spaceWidth: 4), name: .unindent) }
+    @objc private func toggleLineComment() {
+        guard let prefix = current?.lineCommentPrefix else { return }
+        applyLineOperation(.toggleLineComment(prefix: prefix), name: .toggleLineComment)
+    }
+    private func applyLineOperation(_ operation: TextEditingOperations.Operation, name: L10n.Key) {
+        guard window.attachedSheet == nil, let session = current,
+              window.firstResponder === session.textView else { return }
+        Task { @MainActor [weak self, weak session] in
+            guard let session else { return }
+            do {
+                _ = try await session.applyLineOperation(operation, actionName: L10n.text(name), isEligible: { [weak self, weak session] in
+                    guard let self, let session else { return false }
+                    return self.current === session && self.window.attachedSheet == nil && NSApp.modalWindow == nil &&
+                        self.window.firstResponder === session.textView
+                })
+            } catch is CancellationError { }
+            catch {
+                guard let self, self.current === session, self.window.attachedSheet == nil, NSApp.modalWindow == nil else { return }
+                self.showMessage(L10n.text(name), L10n.text(.lineOperationLimit))
+            }
+        }
+    }
+
+    @objc private func goToLine() {
+        guard let session = current, window.attachedSheet == nil, !session.textView.hasMarkedText(),
+              let index = session.lineRuler.currentIndex else { return }
+        let revision = session.revision
+        let alert = NSAlert()
+        alert.messageText = L10n.text(.goToLine)
+        alert.informativeText = L10n.format(.lineRange, index.lineCount)
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        input.stringValue = String(index.lineNumber(atUTF16Offset: session.textView.selectedRange().location) ?? 1)
+        input.setAccessibilityLabel(L10n.text(.lineNumber))
+        alert.accessoryView = input
+        alert.addButton(withTitle: L10n.text(.go))
+        alert.addButton(withTitle: L10n.text(.cancel))
+        alert.window.initialFirstResponder = input
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard session.revision == revision, let line = Int(input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)),
+              session.goToLine(line) else {
+            showMessage(L10n.text(.goToLine), L10n.format(.lineRange, index.lineCount))
+            return
+        }
     }
     @objc private func changeViewMode() {
         _ = current?.presentation?.setShowsStructure(viewMode.selectedSegment == 1)
@@ -418,6 +543,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             let canonical = url.standardizedFileURL.resolvingSymlinksInPath()
             if let existing = sessions.first(where: { $0.file?.url == canonical }) {
                 tabs.selectTabViewItem(existing.item)
+                recentFiles.noteSuccessfulOpen(canonical)
                 continue
             }
             do {
@@ -427,6 +553,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
                     sessions.removeAll()
                 }
                 addSession(EditorSession(file: loaded))
+                recentFiles.noteSuccessfulOpen(loaded.url)
             } catch { showError(error) }
         }
     }
@@ -458,6 +585,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
                 expectedSnapshot: sameFile ? session.file?.diskSnapshot : nil,
                 overwriteExternalChanges: chosen && !sameFile)
             session.acceptSaved(saved)
+            recentFiles.noteSuccessfulOpen(saved.url)
             if chosen { window.makeFirstResponder(session.presentation?.preferredResponder) }
             return true
         } catch DocumentFileError.externalConflict {
@@ -546,6 +674,8 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         if sessions.count == 1 { window.performClose(nil); return }
         guard confirmClose(session) else { return }
         session.presentation?.cancel()
+        session.lineRuler.invalidate()
+        session.syntax.cancel()
         sessions.removeAll { $0 === session }
         tabs.removeTabViewItem(session.item)
         refresh()

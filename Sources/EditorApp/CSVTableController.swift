@@ -556,7 +556,7 @@ final class CSVTableController: NSViewController, NSTableViewDataSource, NSTable
         panel.minSize = NSSize(width: 420, height: 260)
         panel.isReleasedWhenClosed = false
         let content = panel.contentView!
-        let input = NSTextView(usingTextLayoutManager: true)
+        let input = FolivynTextView(usingTextLayoutManager: true)
         input.isRichText = false
         input.importsGraphics = false
         input.allowsUndo = true

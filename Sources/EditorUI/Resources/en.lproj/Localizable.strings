@@ -116,3 +116,21 @@
 "json.error.tooManyNodes" = "Tree view is limited to 100,000 values";
 "json.error.cancelled" = "JSON reading was cancelled";
 "json.error.invalidLimits" = "Invalid JSON parsing limits";
+
+"menu.open_recent" = "Open Recent";
+"recent.empty" = "No Recent Files";
+"recent.clear" = "Clear Menu";
+"action.go_to_line" = "Go to Line…";
+"dialog.line_range" = "Enter a line number from 1 to %d.";
+"dialog.line_number" = "Line number";
+"action.go" = "Go";
+"menu.language" = "Language";
+"language.automatic" = "Automatic";
+"status.no_line_endings" = "No line endings";
+"status.mixed_line_endings" = "Mixed line endings";
+"status.line_index_unavailable" = "Line navigation limit reached";
+
+"action.indent" = "Indent";
+"action.unindent" = "Unindent";
+"action.toggle_line_comment" = "Toggle Line Comment";
+"editing.line_operation_limit" = "This selection cannot be edited safely in one operation. Select fewer lines and try again. The document has not changed.";

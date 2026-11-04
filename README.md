@@ -11,6 +11,7 @@ Folivyn is a personal project that is actively being improved. Feedback, bug rep
 - **Multiple tabs.** Keep files open together, with separate undo histories, selections, and scroll positions.
 - **Reload from disk.** Pick up changes made by other tools. If you have unsaved edits, cancel, discard them, or save a copy before reloading.
 - **Local syntax highlighting.** Read Python, Java, JavaScript, TypeScript, JSON, JSONC, and shell scripts with basic syntax colors. Other text formats open normally.
+- **Everyday code editing.** Logical line numbers, jump to line, per-tab language selection, multiline indentation, and line-comment toggling.
 - **Find and replace.** Use the native find bar for literal search, next/previous matches, and replacement within the current tab.
 - **Finder Quick Look.** The bundled extension provides a read-only, syntax-colored source preview. Python and JSON have been verified through Finder's Space key; provider selection for other types depends on macOS and installed apps.
 - **CSV and TSV tables.** Read string-valued cells, choose comma or tab delimiters, use an optional display header, and edit one cell through the document's existing undo history.
@@ -73,6 +74,12 @@ CSV and TSV open in Table view. Double-click an existing cell to edit its full v
 
 JSON opens with Source and Tree side by side. Selecting a node locates its exact source token; selecting source text locates its containing node. Search the tree, then use Previous or Next to navigate results. Duplicate paths disable Copy JSON Pointer because they do not identify one unique value.
 
+### Everyday editing
+
+File > Open Recent reopens successfully read files. Drop local regular files into the window to use the same open path; file URLs are never inserted into source text or a CSV cell draft. A drop accepts at most 32 files.
+
+Use `⌘L` to jump to a logical line; soft wrapping does not add line numbers. The status bar reports existing line endings without converting them. Edit > Language overrides filename detection for the current tab, including an explicit Plain text option. `⌘]` / `⌘[` add / remove four-space indentation, and `⌘/` toggles the language's line comment. JSON and plain text do not guess a comment syntax.
+
 ## Development
 
 Run the file-handling, editing-session, and localization tests:
@@ -89,7 +96,7 @@ The [structured-view validation record](docs/structured-views-validation.md) cov
 
 ## Roadmap
 
-Line numbers, jump to line, more file-opening workflows, and draft recovery are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
+Draft recovery, large-file read-only fallback, more editing tools, and validation are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
 
 ## Contributing
 

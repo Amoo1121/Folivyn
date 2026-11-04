@@ -24,8 +24,11 @@ individual missing entries is recorded here without declaring full V1 complete:
   mapping and one revision-checked source/undo are implemented. See
   [structured-view validation](structured-views-validation.md), including
   denied-network Chinese workflows and defects found and fixed.
-- F02/F03/F05: independent safe drop/recent-file and TextKit 2 line-ruler
-  foundations are committed; main-window integration and native checks follow.
+- F02/F03/F05/F06: drop/recent-file routing, line numbers/jump, per-tab language
+  choice, indentation and line comments are integrated. Native gutter defects
+  were fixed; English and denied-network Chinese workflows are recorded in
+  [navigation validation](navigation-validation.md). Actual Finder dragging,
+  broader language coverage and remaining input/accessibility checks stay open.
 - Other missing behavior and G01–G06 gates remain open. Historical counts and
   sizes below identify older artifacts and are not measurements of new builds.
 

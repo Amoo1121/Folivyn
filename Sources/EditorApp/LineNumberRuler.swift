@@ -32,6 +32,9 @@ final class LineNumberRuler: NSRulerView {
         self.snapshot = snapshot
         self.builder = builder
         super.init(scrollView: textView.enclosingScrollView, orientation: .verticalRuler)
+        // Since macOS 14 views do not clip by default. NSRulerView's own
+        // border drawing must stay in the gutter when a plain tab is redrawn.
+        clipsToBounds = true
         clientView = textView
         ruleThickness = 42
         reservedThicknessForMarkers = 0

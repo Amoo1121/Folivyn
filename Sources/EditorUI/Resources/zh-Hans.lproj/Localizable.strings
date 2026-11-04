@@ -116,3 +116,21 @@
 "json.error.tooManyNodes" = "树视图最多支持 100,000 个值";
 "json.error.cancelled" = "JSON 读取已取消";
 "json.error.invalidLimits" = "JSON 解析限制无效";
+
+"menu.open_recent" = "最近打开";
+"recent.empty" = "暂无最近文件";
+"recent.clear" = "清除菜单";
+"action.go_to_line" = "跳转到行…";
+"dialog.line_range" = "请输入 1 到 %d 之间的行号。";
+"dialog.line_number" = "行号";
+"action.go" = "跳转";
+"menu.language" = "语言";
+"language.automatic" = "自动识别";
+"status.no_line_endings" = "无换行";
+"status.mixed_line_endings" = "混合换行";
+"status.line_index_unavailable" = "已达到行导航上限";
+
+"action.indent" = "增加缩进";
+"action.unindent" = "减少缩进";
+"action.toggle_line_comment" = "切换行注释";
+"editing.line_operation_limit" = "无法在一次操作中安全处理此选区。请选择较少的行后重试。文档未改变。";

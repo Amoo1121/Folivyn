@@ -5,6 +5,109 @@ import XCTest
 
 final class LineNumberRulerTests: XCTestCase {
     @MainActor
+    func testSessionInstalledAtZeroSizeGetsNarrowGutterAndVisibleNumbers() async throws {
+        _ = NSApplication.shared
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let loaded = try DocumentFile.save("{\n  \"first\": 1,\n  \"second\": 2\n}",
+            to: directory.appendingPathComponent("structure.json"), encoding: .utf8)
+        var sessions: [EditorSession] = []
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 400),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer {
+            for session in sessions { session.lineRuler.invalidate(); session.syntax.cancel(); session.presentation?.cancel() }
+            window.close()
+        }
+        let tabs = NSTabView()
+        tabs.tabViewType = .topTabsBezelBorder
+        tabs.translatesAutoresizingMaskIntoConstraints = false
+        let toolbar = NSStackView()
+        toolbar.addArrangedSubview(NSButton(title: "Open", target: nil, action: nil))
+        toolbar.addArrangedSubview(NSButton(title: "New", target: nil, action: nil))
+        toolbar.translatesAutoresizingMaskIntoConstraints = false
+        let status = NSTextField(labelWithString: "UTF-8 • Python • LF")
+        status.translatesAutoresizingMaskIntoConstraints = false
+        let content = try XCTUnwrap(window.contentView)
+        content.wantsLayer = true
+        for child in [toolbar, tabs, status] { content.addSubview(child) }
+        NSLayoutConstraint.activate([
+            toolbar.topAnchor.constraint(equalTo: content.topAnchor, constant: 10),
+            toolbar.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 14),
+            toolbar.heightAnchor.constraint(equalToConstant: 30),
+            tabs.topAnchor.constraint(equalTo: toolbar.bottomAnchor, constant: 8),
+            tabs.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 10),
+            tabs.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10),
+            tabs.bottomAnchor.constraint(equalTo: status.topAnchor, constant: -7),
+            status.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
+            status.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
+            status.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -9),
+            status.heightAnchor.constraint(equalToConstant: 16)
+        ])
+        // Mirror the native failure: a first plain tab, a JSON split, then a
+        // newly created plain tab. Each session begins with a zero-size scroll view.
+        for file in [nil, loaded, nil] as [LoadedTextFile?] {
+            let session = EditorSession(file: file)
+            sessions.append(session)
+            XCTAssertEqual(session.scrollView.frame.size, .zero)
+            tabs.addTabViewItem(session.item)
+            tabs.selectTabViewItem(session.item)
+            window.makeFirstResponder(session.textView)
+            if file == nil {
+                session.textView.insertText("def main():\n    return 1\nmain()", replacementRange: NSRange(location: 0, length: 0))
+                session.languageOverride = .python
+            }
+            content.layoutSubtreeIfNeeded()
+            try await waitUntil { session.lineRuler.displayedRevision == session.revision }
+            // Include asynchronous highlighting and the first split-divider layout.
+            try await Task.sleep(for: .milliseconds(250))
+            XCTAssertLessThanOrEqual(session.lineRuler.frame.width, session.lineRuler.ruleThickness + 1)
+            XCTAssertEqual(session.lineRuler.visibleLabels().map(\.line), file == nil ? [1, 2, 3] : [1, 2, 3, 4])
+            try assertGutterRendered(in: content, session: session)
+            XCTAssertNotNil(session.textView.textLayoutManager)
+        }
+        tabs.selectTabViewItem(sessions[0].item)
+        tabs.selectTabViewItem(sessions[2].item)
+        content.layoutSubtreeIfNeeded()
+        XCTAssertEqual(sessions[2].lineRuler.visibleLabels().map(\.line), [1, 2, 3])
+        try assertGutterRendered(in: content, session: sessions[2])
+    }
+
+    @MainActor
+    private func assertGutterRendered(in content: NSView, session: EditorSession) throws {
+        let bitmap = try XCTUnwrap(content.bitmapImageRepForCachingDisplay(in: content.bounds))
+        content.cacheDisplay(in: content.bounds, to: bitmap)
+        let ruler = session.lineRuler!
+        let scale = CGFloat(bitmap.pixelsWide) / content.bounds.width
+        let rect = content.convert(ruler.bounds, from: ruler)
+        let top = content.bounds.maxY - rect.maxY
+        func rgba(_ x: CGFloat, _ y: CGFloat) throws -> [CGFloat] {
+            let color = try XCTUnwrap(bitmap.colorAt(x: Int(x * scale), y: Int(y * scale))?.usingColorSpace(.deviceRGB))
+            return [color.redComponent, color.greenComponent, color.blueComponent, color.alphaComponent]
+        }
+        func different(_ lhs: [CGFloat], _ rhs: [CGFloat]) -> Bool {
+            zip(lhs, rhs).contains { abs($0 - $1) > 0.1 }
+        }
+        for label in ruler.visibleLabels() {
+            let y = top + ruler.convert(NSPoint(x: 0, y: label.textY), from: session.textView).y
+            var foundInk = false
+            for row in Int(y)..<Int(y + label.height) {
+                let background = try rgba(rect.minX + 2, CGFloat(row))
+                for column in 18..<38 where try different(rgba(rect.minX + CGFloat(column), CGFloat(row)), background) {
+                    foundInk = true
+                    break
+                }
+                if foundInk { break }
+            }
+            XCTAssertTrue(foundInk, "Logical line \(label.line) must be visible in the composited tab, not merely in ruler layout data")
+        }
+        // The ruler's superclass also draws. Its separator must not extend up
+        // through toolbar/titlebar when AppKit gives it a window-sized dirty rect.
+        XCTAssertFalse(try different(rgba(rect.maxX - 0.5, 4), rgba(rect.maxX + 2, 4)))
+    }
+
+    @MainActor
     func testOnlyLogicalStartsAreLabeledInWrappedViewport() async throws {
         let source = String(repeating: "wrapped text ", count: 20) + "\r\nsecond\nthird\n"
         let fixture = Fixture(source: source, size: NSSize(width: 330, height: 450))
