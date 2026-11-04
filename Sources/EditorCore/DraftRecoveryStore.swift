@@ -226,8 +226,21 @@ public actor DraftRecoveryStore {
     }
 
     /// Releases this instance for recovery. Calling close does not discard data.
+    /// An entirely empty instance can be removed so routine launches do not
+    /// consume the bounded directory-entry budget indefinitely.
     public func close() {
         guard !isClosed else { return }
+        try? RecoveryFiles.withLock(rootLock) {
+            try requireCurrentInstance()
+            let names = try RecoveryFiles.entries(instanceDirectory, limit: limits.maximumDirectoryEntries)
+            guard names == [".lock"] else { return }
+            let lockInfo = try RecoveryFiles.descriptorInfo(instanceLock)
+            try RecoveryFiles.removeRegular(".lock", in: instanceDirectory, missingAllowed: false, expected: lockInfo)
+            guard unlinkat(directory.value, instanceID.uuidString, AT_REMOVEDIR) == 0 else {
+                throw RecoveryFiles.io("remove empty recovery instance")
+            }
+            try RecoveryFiles.sync(directory, operation: "sync empty recovery cleanup")
+        }
         isClosed = true
         instanceLock.close()
         rootLock.close()

@@ -4,6 +4,24 @@ import XCTest
 @testable import EditorCore
 
 final class DraftRecoveryStoreTests: XCTestCase {
+    func testNormalEmptyCloseDoesNotAccumulateInstanceDirectories() async throws {
+        for _ in 0..<12 {
+            let store = try DraftRecoveryStore(directory: root)
+            await store.close()
+        }
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [".store.lock"])
+    }
+
+    func testClosePreservesUnknownOrIncompleteRecoveryFiles() async throws {
+        let store = try DraftRecoveryStore(directory: root)
+        let folder = root.appendingPathComponent(store.instanceID.uuidString)
+        let pending = folder.appendingPathComponent("interrupted.tmp")
+        try Data("keep for inspection".utf8).write(to: pending)
+        await store.close()
+        XCTAssertEqual(try Data(contentsOf: pending), Data("keep for inspection".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent(".lock").path))
+    }
+
     private var directory: URL!
     override func setUpWithError() throws {
         if let childRoot = ProcessInfo.processInfo.environment["FOLIVYN_RECOVERY_PROCESS_ROOT"] {
