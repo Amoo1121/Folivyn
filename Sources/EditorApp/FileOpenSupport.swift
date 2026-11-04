@@ -108,6 +108,13 @@ final class FolivynWindow: NSWindow, NSDraggingDestination {
 
 @MainActor
 final class FolivynTextView: NSTextView {
+    weak var editorDecorations: EditorDecorations?
+
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        editorDecorations?.draw(in: rect)
+    }
+
     override var acceptableDragTypes: [NSPasteboard.PasteboardType] {
         let native = super.acceptableDragTypes
         return native.contains(.fileURL) ? native : native + [.fileURL]
