@@ -96,6 +96,18 @@ public enum DocumentFile {
         )
     }
 
+    /// Captures an existing destination without decoding it as editable text.
+    /// Uses the same bounded regular-file read as Open. Absence remains an
+    /// explicit expectation; callers must not reinterpret it as overwrite consent.
+    public static func snapshotIfPresent(_ url: URL) throws -> DiskSnapshot? {
+        let target = try canonicalURL(url)
+        do {
+            return DiskSnapshot(try readBytes(target))
+        } catch DocumentFileError.fileNotFound {
+            return nil
+        }
+    }
+
     /// Pass the snapshot returned by the most recent successful read/save.
     /// A nil snapshot is for new destinations: existing destinations need explicit overwrite.
     /// New destinations without overwrite consent are published only if still absent.

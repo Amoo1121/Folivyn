@@ -11,6 +11,10 @@ text editor. It did not establish that Finder Quick Look or full V1 was complete
 
 ## Progress — 2026-11-04
 
+- G01: new destinations now publish only while absent; Save As and reload-copy
+  preserve the pre-confirmation destination snapshot. A native Replace-dialog
+  race retains the external writer's bytes. See [save destination validation](save-destination-validation.md)
+  for 277 normal/offline tests and the remaining existing-file/durability limits.
 - F06/E07: basic Swift, C/C++, Go and Rust coloring is integrated, including
   language menu and line comments. All five have native display evidence;
   raw-string bracket ambiguity is conservatively refused. See

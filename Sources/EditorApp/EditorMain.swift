@@ -737,8 +737,10 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     @objc private func saveDocumentAs() { if let session = current { _ = save(session, saveAs: true) } }
 
     private func pickSaveLocation(for session: EditorSession, copy: Bool = false,
-                                  encoding: TextFileEncoding? = nil) -> (url: URL, encoding: TextFileEncoding)? {
+                                  encoding: TextFileEncoding? = nil) -> (url: URL, encoding: TextFileEncoding, expectedSnapshot: DiskSnapshot?)? {
         let panel = NSSavePanel()
+        let destinationDelegate = SaveDestinationPanelDelegate()
+        panel.delegate = destinationDelegate
         panel.nameFieldStringValue = session.file?.url.lastPathComponent ?? (session.recoveryOriginPath != nil ? session.name : "Untitled.txt")
         panel.directoryURL = session.file?.url.deletingLastPathComponent()
         panel.title = copy ? L10n.text(.saveCopyTitle) : L10n.text(.saveTitle)
@@ -761,21 +763,27 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         panel.accessoryView = accessory
         guard panel.runModal() == .OK, let url = panel.url,
               TextFileEncoding.allCases.indices.contains(encodingPicker.indexOfSelectedItem) else { return nil }
-        return (url, TextFileEncoding.allCases[encodingPicker.indexOfSelectedItem])
+        do {
+            let destination = try destinationDelegate.choice(for: url)
+            return (destination.url, TextFileEncoding.allCases[encodingPicker.indexOfSelectedItem], destination.expectedSnapshot)
+        } catch { showError(error); return nil }
     }
 
     private func save(_ session: EditorSession, saveAs: Bool, encodingOverride: TextFileEncoding? = nil) -> Bool {
         guard window.attachedSheet == nil, !session.isReadOnly else { return false }
         let chosen = saveAs || session.file == nil
         let url: URL
+        let destinationSnapshot: DiskSnapshot?
         var encoding = encodingOverride ?? session.saveEncoding
         if chosen {
             guard let choice = pickSaveLocation(for: session, encoding: encoding) else { return false }
             url = choice.url
             encoding = choice.encoding
+            destinationSnapshot = choice.expectedSnapshot
         } else {
             guard let existing = session.file?.url else { return false }
             url = existing
+            destinationSnapshot = nil
         }
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath()
         if let other = sessions.first(where: { $0 !== session && $0.documentURL == canonical }) {
@@ -786,14 +794,14 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         do {
             let saved = try DocumentFile.save(session.textView.string, to: url,
                 encoding: encoding,
-                expectedSnapshot: sameFile ? session.file?.diskSnapshot : nil,
-                overwriteExternalChanges: chosen && !sameFile)
+                expectedSnapshot: sameFile ? session.file?.diskSnapshot : destinationSnapshot)
             session.acceptSaved(saved)
             recentFiles.noteSuccessfulOpen(saved.url)
             if chosen { window.makeFirstResponder(session.presentation?.preferredResponder) }
             return true
         } catch DocumentFileError.externalConflict {
-            session.diskChanged = true
+            // A competing Save As destination says nothing about the open source.
+            if sameFile { session.diskChanged = true }
             refresh()
             let alert = NSAlert()
             alert.messageText = L10n.text(.conflictTitle)
@@ -827,7 +835,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
                 }
                 do {
                     _ = try DocumentFile.save(session.textView.string, to: copy.url,
-                        encoding: copy.encoding, overwriteExternalChanges: true)
+                        encoding: copy.encoding, expectedSnapshot: copy.expectedSnapshot)
                 } catch { showError(error); return }
             default: return
             }
