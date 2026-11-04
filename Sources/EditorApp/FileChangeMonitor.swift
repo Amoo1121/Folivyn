@@ -17,6 +17,18 @@ final class FileChangeMonitor {
     init(url: URL, changed: @escaping () -> Void) {
         self.url = url
         self.changed = changed
+        reconnect()
+    }
+
+    /// Rebind both inodes after activation. A directory watch follows its old
+    /// inode if the parent directory is renamed or replaced at the same path.
+    /// The caller still checks contents separately; reattaching is not a check.
+    func reconnect() {
+        guard !stopped else { return }
+        pending?.cancel()
+        pending = nil
+        fileSource?.cancel()
+        directorySource?.cancel()
         directorySource = observe(url.deletingLastPathComponent(), isDirectory: true)
         fileSource = observe(url, isDirectory: false)
     }
