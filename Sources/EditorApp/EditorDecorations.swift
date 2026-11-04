@@ -54,6 +54,9 @@ final class EditorDecorations: NSObject {
     /// Selection notifications are observed without replacing the text delegate.
     func refresh() {
         invalidate()
+        // An owner may briefly retain an old controller after installing another
+        // one. Later owner callbacks must not reactivate the superseded observer.
+        guard textView?.editorDecorations === self else { return }
         active = true
         guard let textView, !textView.hasMarkedText(), textView.textLayoutManager != nil,
               textView.selectedRanges.count == 1,

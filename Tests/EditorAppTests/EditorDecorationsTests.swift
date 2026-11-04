@@ -235,6 +235,27 @@ final class EditorDecorationsTests: XCTestCase {
     }
 
     @MainActor
+    func testSupersededControllerCannotRestartThroughOwnerRefresh() async throws {
+        let fixture = Fixture(source: "(text)")
+        defer { fixture.close() }
+        let previous = try XCTUnwrap(fixture.session.decorations)
+        fixture.session.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        let current = fixture.attach()
+        try await waitUntil { current.bracketPair != nil }
+        previous.refresh()
+        XCTAssertTrue(fixture.session.textView.editorDecorations === current)
+        XCTAssertNil(previous.visibleGeometry().currentLine)
+        current.invalidate()
+        fixture.replace("[changed]")
+        // Session's text delegate calls its original controller. Neither that
+        // superseded controller nor an explicitly disabled one may restart.
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertNil(previous.displayedRevision)
+        XCTAssertNil(current.displayedRevision)
+        XCTAssertNil(current.visibleGeometry().currentLine)
+    }
+
+    @MainActor
     private func pixelDiffers(_ lhs: NSBitmapImageRep, _ rhs: NSBitmapImageRep, at point: NSPoint, in view: NSView) throws -> Bool {
         let scale = CGFloat(lhs.pixelsWide) / view.bounds.width
         let x = Int((point.x - view.bounds.minX) * scale)
@@ -267,6 +288,10 @@ final class EditorDecorationsTests: XCTestCase {
             window.contentView = session.presentation?.view
             replace(source)
             layout()
+            // Session now attaches decorations itself. This fixture supplies
+            // injected language/matcher callbacks and needs an undecorated
+            // baseline before installing its replacement controller.
+            session.decorations?.invalidate()
         }
 
         func attach(matcher: @escaping EditorDecorations.Matcher = { try BracketMatcher.match(in: $0, atUTF16Offset: $1, policy: $2) }) -> EditorDecorations {
@@ -300,6 +325,7 @@ final class EditorDecorationsTests: XCTestCase {
 
         func close() {
             decorations?.invalidate()
+            session.decorations?.invalidate()
             session.syntax.cancel()
             session.lineRuler.invalidate()
             session.presentation?.cancel()
