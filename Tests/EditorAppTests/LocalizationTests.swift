@@ -37,9 +37,9 @@ final class LocalizationTests: XCTestCase {
                            "\(fileName) — \(L10n.appName)")
         }
         XCTAssertEqual(L10n.format(.openMessage, 10, language: "en"),
-                       "Choose text or code files up to 10 MiB.")
+                       "Edit text or code files up to 10 MiB. Larger files open as a limited read-only preview.")
         XCTAssertEqual(L10n.format(.openMessage, 10, language: "zh-Hans"),
-                       "选择不超过 10 MiB 的文本或代码文件。")
+                       "可编辑不超过 10 MiB 的文本或代码文件；更大的文件以有限的只读预览打开。")
     }
 
     func testEnglishFallbackAndSimplifiedChineseAreReadFromTheResourceBundle() {
