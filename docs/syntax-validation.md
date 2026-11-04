@@ -59,6 +59,12 @@ this checkpoint showed only the system file icon: its dynamic type inherited
 `public.data`, not `public.text`. Main-window coloring alone therefore does not
 establish Finder routing for the new language types.
 
+The later type-routing correction now also has native Go/Rust Finder evidence;
+see [Quick Look validation](quick-look-validation.md). A denied-network Chinese
+run checked the Rust tab, its colors, and the translated Language menu containing
+all five added languages. Later save changes bring the full suite to 277 passing
+tests normally and offline; the following size identifies the earlier checkpoint.
+
 This checkpoint's signed app totals **1,486,776 logical bytes**, **1,512 KiB**
 allocated. Main executable SHA-256:
 `e40ffd88b2ba62667bc186c5efd7f08222a0e8a77c084f27df6bb3caf124a931`.

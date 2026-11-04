@@ -26,6 +26,8 @@
                 <string>public.swift-source</string><string>public.c-source</string>
                 <string>public.c-header</string><string>public.c-plus-plus-source</string>
                 <string>public.c-plus-plus-header</string><string>public.objective-c-source</string>
+                <string>io.github.amoo1121.folivyn.go-source</string>
+                <string>io.github.amoo1121.folivyn.rust-source</string>
                 <string>net.daringfireball.markdown</string><string>public.yaml</string>
                 <string>public.toml</string>
                 <string>public.json</string><string>public.comma-separated-values-text</string>

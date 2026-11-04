@@ -13,7 +13,7 @@ Folivyn is a personal project that is actively being improved. Feedback, bug rep
 - **Local syntax highlighting.** Read Python, Java, JavaScript, TypeScript, Swift, C/C++, Go, Rust, JSON, JSONC, and shell scripts with basic syntax colors. Other text formats open normally.
 - **Everyday code editing.** Logical line numbers, jump to line, per-tab language selection, multiline indentation, line-comment toggling, current-line shading, and bounded bracket hints.
 - **Find and replace.** Use the native find bar for literal search, next/previous matches, and replacement within the current tab.
-- **Finder Quick Look.** The bundled extension provides a read-only, syntax-colored source preview. Python, JSON, and Swift have been verified through Finder's Space key; provider selection for other types depends on macOS and installed apps.
+- **Finder Quick Look.** The bundled extension provides a read-only, syntax-colored source preview. Python, JSON, Swift, Go, and Rust have been verified through Finder's Space key; provider selection for other types depends on macOS and installed apps.
 - **CSV and TSV tables.** Read string-valued cells, choose comma or tab delimiters, use an optional display header, and edit one cell through the document's existing undo history.
 - **JSON navigation.** Browse a collapsible tree beside the source, search keys and values, and copy unambiguous JSON Pointers. Duplicate keys and original number spellings remain intact.
 - **Local draft recovery.** Periodic snapshots of unsaved text can be restored as independent tabs after an interrupted session, without overwriting the original files.
@@ -68,7 +68,7 @@ The main window also offers read-only previews bounded to **200 KiB** or **2,000
 
 ### Finder preview
 
-Launch the built app once, then select a supported file in Finder and press Space. The preview header says **Folivyn · Read-only preview** when this extension is active. macOS may select another installed provider; CSV currently opens with Numbers' preview on the tested Mac. Folivyn does not change your default opening app. See [Quick Look setup and verification](docs/quick-look-validation.md) for local-build registration, tested types, and limitations.
+Launch the built app once, then select a supported file in Finder and press Space. The preview header says **Folivyn · Read-only preview** when this extension is active. macOS may select another installed provider; CSV currently opens with Numbers' preview on the tested Mac. Folivyn does not request a default-app change; macOS resolves opening and preview providers from its file types and installed apps. See [Quick Look setup and verification](docs/quick-look-validation.md) for local-build registration, tested types, and limitations.
 
 ### Structured files
 

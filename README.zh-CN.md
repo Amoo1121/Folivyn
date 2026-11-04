@@ -13,7 +13,7 @@ Folivyn 是一个由个人开发、持续完善中的项目。欢迎通过 [GitH
 - **本地语法着色。** 为 Python、Java、JavaScript、TypeScript、Swift、C/C++、Go、Rust、JSON、JSONC 和 Shell 提供基础着色；其他文本格式照常打开。
 - **日常代码编辑。** 显示逻辑行号，支持跳转到行、按标签手动选择语法语言，以及多行缩进、行注释切换、当前行底色和有限范围的括号提示。
 - **查找与替换。** 使用原生查找栏，在当前标签内进行字面文本搜索、切换匹配及替换。
-- **Finder 空格预览。** 内置扩展提供只读源码与语法着色。Python、JSON、Swift 已通过真实 Finder 空格键验证；其他类型使用哪个预览器取决于 macOS 和已安装应用。
+- **Finder 空格预览。** 内置扩展提供只读源码与语法着色。Python、JSON、Swift、Go、Rust 已通过真实 Finder 空格键验证；其他类型使用哪个预览器取决于 macOS 和已安装应用。
 - **CSV 与 TSV 表格。** 字段始终作为文本显示，支持逗号/制表符选择、可选表头与单元格编辑，并共用文档的撤销记录。
 - **JSON 导航。** 源码旁显示可折叠树，支持键值搜索和无歧义的 JSON Pointer 复制；保留重复键及数字的原始写法。
 - **本地草稿恢复。** 定期保存未保存正文的恢复快照，中断后可恢复为独立标签，不会覆盖原文件。
@@ -68,7 +68,7 @@ open "build/Folivyn.app"
 
 ### Finder 预览
 
-先运行构建后的应用，再在 Finder 选中支持的文件并按空格。使用本扩展时，预览顶部会显示 **Folivyn · 只读预览**（英文界面为 **Folivyn · Read-only preview**）。macOS 可能选用其他已安装的预览器；当前测试机器上的 CSV 由 Numbers 接管。Folivyn 不会更改默认打开方式。本地构建注册、已验证类型与限制见 [Quick Look 验证记录](docs/quick-look-validation.md)。
+先运行构建后的应用，再在 Finder 选中支持的文件并按空格。使用本扩展时，预览顶部会显示 **Folivyn · 只读预览**（英文界面为 **Folivyn · Read-only preview**）。macOS 可能选用其他已安装的预览器；当前测试机器上的 CSV 由 Numbers 接管。Folivyn 不主动设置默认打开应用；具体打开和预览方式由 macOS 根据文件类型及已安装应用决定。本地构建注册、已验证类型与限制见 [Quick Look 验证记录](docs/quick-look-validation.md)。
 
 ### 结构化文件
 

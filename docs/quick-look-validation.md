@@ -5,6 +5,38 @@ Xcode 26.6 (17F113). These observations cover the local development build;
 they do not establish a notarized release or compatibility with macOS 14.
 Cancellation review, automated retest, and rebuilt Finder smoke check: 2026-11-03.
 
+## Additional language routing — 2026-11-04
+
+Finder Space displayed the Folivyn header and source colors for Swift, Go and
+Rust fixtures, including Chinese/emoji, nested comments, raw strings and Rust
+lifetimes. The original file hashes remained unchanged. The Swift action stayed
+Open with Xcode; the final Go and Rust previews showed Open with Visual Studio
+Code. These Finder invocations were not independently network-denied. A separate
+main-app Chinese run denied networking and verified the Rust tab and language
+menu; the combined 277-test suite also passed with networking denied.
+
+Initially Go showed only a file icon. Go/Rust had dynamic identifiers inheriting
+only `public.data`, so the source/text preview types did not match. The app now
+imports fallback `.go` / `.rs` declarations under its own namespace:
+`io.github.amoo1121.folivyn.go-source` and `.rust-source`, conforming to source
+code and text. These are not claimed to be official Go/Rust identifiers.
+The extension explicitly accepts them. The metadata was independently written
+from [Apple's type-declaration documentation](https://developer.apple.com/documentation/uniformtypeidentifiers/defining-file-and-data-types-for-your-app).
+
+An intermediate exact Editor/Alternate association made macOS choose Folivyn as
+the Go opening app. That extra association was removed. The final app retains its
+previous broad text/source Alternate declarations; a rebuild and targeted local
+Launch Services registration restored Visual Studio Code while retaining Folivyn
+previews. No default-association setter or global registry reset was used.
+`Alternate` does not guarantee that macOS can never select an app; fresh installs
+and other app combinations still need validation. See [Apple's handler-rank keys](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html).
+
+The final arm64 app, including current save protections, totals **1,505,901 logical
+bytes** and **1,532 KiB** allocated. Executable SHA-256:
+`8623651ed72a14b74457ecdae389f224f0bfa997c68d553ccb61da89fbaf5d8f`.
+Strict nested ad hoc signature verification and packaged MIT license comparison
+pass. This remains a local development build, not a notarized distribution.
+
 ## What was observed in Finder
 
 The native UI checks used Finder's Space key on files in the ignored fixture

@@ -11,6 +11,11 @@ text editor. It did not establish that Finder Quick Look or full V1 was complete
 
 ## Progress — 2026-11-04
 
+- F01: Swift, Go and Rust now have native Finder Space evidence. Go/Rust fallback
+  type declarations preserve source preview eligibility; final local previews
+  retain Visual Studio Code as their opening action. The intermediate association
+  issue and remaining provider/installation limits are recorded in
+  [Quick Look validation](quick-look-validation.md).
 - G01: new destinations now publish only while absent; Save As and reload-copy
   preserve the pre-confirmation destination snapshot. A native Replace-dialog
   race retains the external writer's bytes. See [save destination validation](save-destination-validation.md)
