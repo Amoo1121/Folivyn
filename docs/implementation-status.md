@@ -11,6 +11,11 @@ text editor. It did not establish that Finder Quick Look or full V1 was complete
 
 ## Progress — 2026-11-04
 
+- F06/E07: basic Swift, C/C++, Go and Rust coloring is integrated, including
+  language menu and line comments. All five have native display evidence;
+  raw-string bracket ambiguity is conservatively refused. See
+  [Syntax validation](syntax-validation.md) for the 259-test checkpoint,
+  subsequent matcher checks, provenance and remaining language limits.
 - F09/F16: main-window read-only fallback is integrated and exercised offline
   with a 100 MiB file, binary controls, invalid UTF-8, reload and multiple tabs.
   Prefix text never enters the editable buffer or Save/Save As path.
