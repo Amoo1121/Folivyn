@@ -98,6 +98,7 @@ public enum DocumentFile {
 
     /// Pass the snapshot returned by the most recent successful read/save.
     /// A nil snapshot is for new destinations: existing destinations need explicit overwrite.
+    /// New destinations without overwrite consent are published only if still absent.
     /// Foundation's atomic replacement preserves the existing file on ordinary write failures.
     /// It preserves POSIX permissions on the tested local APFS filesystem. It is not a
     /// cross-process compare-and-swap: a separate writer can race the final check and rename.
@@ -107,6 +108,20 @@ public enum DocumentFile {
         encoding: TextFileEncoding,
         expectedSnapshot: DiskSnapshot? = nil,
         overwriteExternalChanges: Bool = false
+    ) throws -> LoadedTextFile {
+        try save(text, to: url, encoding: encoding, expectedSnapshot: expectedSnapshot,
+                 overwriteExternalChanges: overwriteExternalChanges, beforeNewFilePublish: nil)
+    }
+
+    /// An internal checkpoint lets tests create a competing destination after validation.
+    /// Production callers always use the public entry point without a checkpoint.
+    static func save(
+        _ text: String,
+        to url: URL,
+        encoding: TextFileEncoding,
+        expectedSnapshot: DiskSnapshot? = nil,
+        overwriteExternalChanges: Bool = false,
+        beforeNewFilePublish: (() throws -> Void)?
     ) throws -> LoadedTextFile {
         let target = try canonicalURL(url)
         let data = encode(text, encoding: encoding)
@@ -147,7 +162,13 @@ public enum DocumentFile {
         }
 
         do {
-            try data.write(to: target, options: .atomic)
+            if expectedSnapshot == nil && !overwriteExternalChanges {
+                try NewDocumentWriter.write(data, to: target, beforePublish: beforeNewFilePublish)
+            } else {
+                try data.write(to: target, options: .atomic)
+            }
+        } catch let error as DocumentFileError {
+            throw error
         } catch {
             throw DocumentFileError.saveFailed(target, reason: error.localizedDescription)
         }
