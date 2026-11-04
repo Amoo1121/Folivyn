@@ -80,7 +80,12 @@ JSON opens with Source and Tree side by side. Selecting a node locates its exact
 
 File > Open Recent reopens successfully read files. Drop local regular files into the window to use the same open path; file URLs are never inserted into source text or a CSV cell draft. A drop accepts at most 32 files.
 
-Use `⌘L` to jump to a logical line; soft wrapping does not add line numbers. The status bar reports existing line endings without converting them. Edit > Language overrides filename detection for the current tab, including an explicit Plain text option. `⌘]` / `⌘[` add / remove four-space indentation, and `⌘/` toggles the language's line comment. JSON and plain text do not guess a comment syntax.
+Use `⌘L` to jump to a logical line; soft wrapping does not add line numbers. The status bar reports existing line endings without converting them. Edit > Convert Line Endings explicitly converts CR/LF/CRLF in the whole document to LF, CRLF, or CR as one undoable edit; it does not save the file. Edit > Language overrides filename detection for the current tab, including an explicit Plain text option. `⌘]` / `⌘[` add / remove four-space indentation, and `⌘/` toggles the language's line comment. JSON and plain text do not guess a comment syntax.
+
+Save and Save As panels include an encoding selector for UTF-8, UTF-8 BOM,
+and UTF-16 LE/BE BOM. The default preserves the document's encoding. Ordinary
+Save keeps that encoding; cancelling a panel changes neither the document nor
+the file. Encoding selection does not normalize line endings.
 
 ### Draft recovery
 
@@ -113,7 +118,7 @@ The [structured-view validation record](docs/structured-views-validation.md) cov
 
 ## Roadmap
 
-Explicit text conversions and further validation are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
+Further language coverage, performance measurements, accessibility, and release validation are in progress. See the [implementation map](docs/implementation-status.md) for the wider scope and remaining validation gates.
 
 ## Contributing
 

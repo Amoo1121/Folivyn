@@ -17,6 +17,9 @@ text editor. It did not establish that Finder Quick Look or full V1 was complete
 - F10: file events are connected to sessions. Native frontmost-app checks show
   ordinary writes and atomic replacement updating the warning while retaining
   the local text. Save As rebinds the observation; closing stops it.
+- F08: explicit whole-document LF/CRLF/CR conversion is one undoable edit;
+  save panels offer the four already-supported encodings. Native and exact-byte
+  checks are recorded in [Text conversion validation](text-conversion-validation.md).
 - F06: current visual-line shading and bounded bracket hints are integrated;
   native display and offscreen pixel/IME/undo checks are recorded.
 - F11: startup recovery, deferred recovery, independent unsaved tabs, encoding

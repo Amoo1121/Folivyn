@@ -168,3 +168,8 @@
 "recovery.summary" = "%ld drafts are available. Restore opens independent unsaved tabs; it never overwrites their original files.";
 "recovery.unreadable_count" = "%ld unreadable recovery items were kept for inspection.";
 "recovery.too_many" = "Only %ld drafts can be displayed at once. Recovery copies are kept unchanged.";
+
+"editing.convert_line_endings" = "Convert Line Endings";
+"editing.convert_line_endings_to" = "Convert Line Endings to %@";
+"editing.newline_conversion_limit" = "This conversion could not be applied within the text or selection limits. The document is unchanged.";
+"dialog.save.encoding" = "Encoding:";

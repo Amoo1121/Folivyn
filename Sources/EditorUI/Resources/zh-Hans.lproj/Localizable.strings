@@ -168,3 +168,8 @@
 "recovery.summary" = "发现 %ld 份草稿。恢复将打开独立的未保存标签，不会覆盖原文件。";
 "recovery.unreadable_count" = "另有 %ld 个无法读取的恢复项，已保留供检查。";
 "recovery.too_many" = "一次最多显示 %ld 份草稿。恢复副本保持不变。";
+
+"editing.convert_line_endings" = "转换换行符";
+"editing.convert_line_endings_to" = "将换行符转换为 %@";
+"editing.newline_conversion_limit" = "无法在文本或选区限制内应用此转换，文档保持不变。";
+"dialog.save.encoding" = "编码：";

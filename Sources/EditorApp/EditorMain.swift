@@ -424,6 +424,13 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             item.tag = index
         }
         addMenu(L10n.text(.language), menu: languages, to: edit)
+        let newlines = NSMenu(title: L10n.text(.convertLineEndings))
+        for (index, target) in NewlineConversion.Target.allCases.enumerated() {
+            let item = newlines.addItem(withTitle: target.rawValue, action: #selector(convertLineEndings(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = index
+        }
+        addMenu(L10n.text(.convertLineEndings), menu: newlines, to: edit)
         edit.addItem(.separator())
         addAction(L10n.text(.indent), #selector(indentLines), "]", to: edit)
         addAction(L10n.text(.unindent), #selector(unindentLines), "[", to: edit)
@@ -472,6 +479,14 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         guard !terminationPending, window?.attachedSheet == nil else { return false }
         if item.action == #selector(recoverDrafts) { return !recoveryOperationPending }
+        if item.action == #selector(convertLineEndings(_:)) {
+            guard let session = current, !session.isReadOnly, !session.lineEditPending,
+                  !session.textView.hasMarkedText(), window.firstResponder === session.textView else { return false }
+            if let menuItem = item as? NSMenuItem, NewlineConversion.Target.allCases.indices.contains(menuItem.tag) {
+                menuItem.state = session.lineRuler.currentIndex?.newlineStyle.rawValue == NewlineConversion.Target.allCases[menuItem.tag].rawValue ? .on : .off
+            }
+            return true
+        }
         if current?.isReadOnly == true,
            [#selector(saveDocument), #selector(saveDocumentAs), #selector(goToLine), #selector(changeLanguage(_:)),
             #selector(performTextFinderAction(_:)), #selector(indentLines), #selector(unindentLines), #selector(toggleLineComment)].contains(item.action) {
@@ -616,6 +631,22 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     }
 
     @objc private func indentLines() { applyLineOperation(.indent(unit: "    "), name: .indent) }
+    @objc private func convertLineEndings(_ sender: NSMenuItem) {
+        guard let session = current, NewlineConversion.Target.allCases.indices.contains(sender.tag),
+              window.attachedSheet == nil, window.firstResponder === session.textView else { return }
+        let target = NewlineConversion.Target.allCases[sender.tag]
+        Task { @MainActor [weak self, weak session] in
+            guard let self, let session else { return }
+            _ = await session.applyNewlineConversion(target,
+                actionName: L10n.format(.convertLineEndingsTo, target.rawValue),
+                isEligible: { [weak self, weak session] in
+                    guard let self, let session else { return false }
+                    return !terminationPending && current === session && window.firstResponder === session.textView
+                }, onError: { [weak self] _ in
+                    self?.showMessage(L10n.text(.operationFailed), L10n.text(.newlineConversionLimit))
+                })
+        }
+    }
     @objc private func unindentLines() { applyLineOperation(.unindent(spaceWidth: 4), name: .unindent) }
     @objc private func toggleLineComment() {
         guard let prefix = current?.lineCommentPrefix else { return }
@@ -705,18 +736,47 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
     @objc private func saveDocument() { if let session = current { _ = save(session, saveAs: false) } }
     @objc private func saveDocumentAs() { if let session = current { _ = save(session, saveAs: true) } }
 
-    private func pickSaveURL(for session: EditorSession, copy: Bool = false) -> URL? {
+    private func pickSaveLocation(for session: EditorSession, copy: Bool = false,
+                                  encoding: TextFileEncoding? = nil) -> (url: URL, encoding: TextFileEncoding)? {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = session.file?.url.lastPathComponent ?? (session.recoveryOriginPath != nil ? session.name : "Untitled.txt")
         panel.directoryURL = session.file?.url.deletingLastPathComponent()
         panel.title = copy ? L10n.text(.saveCopyTitle) : L10n.text(.saveTitle)
-        return panel.runModal() == .OK ? panel.url : nil
+        let encodingPicker = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 220, height: 28), pullsDown: false)
+        encodingPicker.addItems(withTitles: TextFileEncoding.allCases.map(\.displayName))
+        encodingPicker.selectItem(at: TextFileEncoding.allCases.firstIndex(of: encoding ?? session.saveEncoding) ?? 0)
+        encodingPicker.setAccessibilityLabel(L10n.text(.saveEncoding))
+        let row = NSStackView(views: [NSTextField(labelWithString: L10n.text(.saveEncoding)), encodingPicker])
+        row.orientation = .horizontal
+        row.spacing = 10
+        row.translatesAutoresizingMaskIntoConstraints = false
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 40))
+        accessory.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.centerXAnchor.constraint(equalTo: accessory.centerXAnchor),
+            row.centerYAnchor.constraint(equalTo: accessory.centerYAnchor),
+            row.leadingAnchor.constraint(greaterThanOrEqualTo: accessory.leadingAnchor, constant: 12),
+            row.trailingAnchor.constraint(lessThanOrEqualTo: accessory.trailingAnchor, constant: -12)
+        ])
+        panel.accessoryView = accessory
+        guard panel.runModal() == .OK, let url = panel.url,
+              TextFileEncoding.allCases.indices.contains(encodingPicker.indexOfSelectedItem) else { return nil }
+        return (url, TextFileEncoding.allCases[encodingPicker.indexOfSelectedItem])
     }
 
-    private func save(_ session: EditorSession, saveAs: Bool) -> Bool {
+    private func save(_ session: EditorSession, saveAs: Bool, encodingOverride: TextFileEncoding? = nil) -> Bool {
         guard window.attachedSheet == nil, !session.isReadOnly else { return false }
         let chosen = saveAs || session.file == nil
-        guard let url = chosen ? pickSaveURL(for: session) : session.file?.url else { return false }
+        let url: URL
+        var encoding = encodingOverride ?? session.saveEncoding
+        if chosen {
+            guard let choice = pickSaveLocation(for: session, encoding: encoding) else { return false }
+            url = choice.url
+            encoding = choice.encoding
+        } else {
+            guard let existing = session.file?.url else { return false }
+            url = existing
+        }
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath()
         if let other = sessions.first(where: { $0 !== session && $0.documentURL == canonical }) {
             showMessage(L10n.text(.alreadyOpenTitle), L10n.format(.alreadyOpenMessage, other.name))
@@ -725,7 +785,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
         let sameFile = canonical == session.file?.url
         do {
             let saved = try DocumentFile.save(session.textView.string, to: url,
-                encoding: session.saveEncoding,
+                encoding: encoding,
                 expectedSnapshot: sameFile ? session.file?.diskSnapshot : nil,
                 overwriteExternalChanges: chosen && !sameFile)
             session.acceptSaved(saved)
@@ -740,7 +800,7 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             alert.informativeText = L10n.text(.conflictMessage)
             alert.addButton(withTitle: L10n.text(.cancel))
             alert.addButton(withTitle: L10n.text(.saveAs))
-            if alert.runModal() == .alertSecondButtonReturn { return save(session, saveAs: true) }
+            if alert.runModal() == .alertSecondButtonReturn { return save(session, saveAs: true, encodingOverride: encoding) }
             return false
         } catch { showError(error); return false }
     }
@@ -759,15 +819,15 @@ final class EditorApplication: NSObject, NSApplicationDelegate, NSWindowDelegate
             switch alert.runModal() {
             case .alertSecondButtonReturn: break
             case .alertThirdButtonReturn:
-                guard let copy = pickSaveURL(for: session, copy: true) else { return }
-                let canonical = copy.standardizedFileURL.resolvingSymlinksInPath()
+                guard let copy = pickSaveLocation(for: session, copy: true) else { return }
+                let canonical = copy.url.standardizedFileURL.resolvingSymlinksInPath()
                 guard canonical != source, !sessions.contains(where: { $0 !== session && $0.documentURL == canonical }) else {
                     showMessage(L10n.text(.copyLocationTitle), L10n.text(.copyLocationMessage))
                     return
                 }
                 do {
-                    _ = try DocumentFile.save(session.textView.string, to: copy,
-                        encoding: session.saveEncoding, overwriteExternalChanges: true)
+                    _ = try DocumentFile.save(session.textView.string, to: copy.url,
+                        encoding: copy.encoding, overwriteExternalChanges: true)
                 } catch { showError(error); return }
             default: return
             }
