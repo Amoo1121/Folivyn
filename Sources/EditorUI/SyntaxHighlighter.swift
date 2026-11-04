@@ -71,7 +71,7 @@ public final class SyntaxHighlighter {
                   let self, let textView,
                   self.revision == requestedRevision,
                   !textView.hasMarkedText(),
-                  textView.string == snapshot else { return }
+                  textView.string.utf16.elementsEqual(snapshot.utf16) else { return }
             self.apply(tokens, to: textView)
         }
     }

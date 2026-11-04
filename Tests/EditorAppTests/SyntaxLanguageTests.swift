@@ -3,6 +3,26 @@ import EditorUI
 import XCTest
 
 final class SyntaxLanguageTests: XCTestCase {
+    @MainActor
+    func testCanonicallyEquivalentUnreportedEditRejectsOldUTF16ColorRanges() async throws {
+        _ = NSApplication.shared
+        let view = NSTextView(usingTextLayoutManager: true)
+        view.string = "\"é\" true"
+        let highlighter = SyntaxHighlighter()
+        defer { highlighter.cancel() }
+        highlighter.highlight(textView: view, fileURL: nil, override: .json)
+        // NSString permits this edit without the NSTextView change delegate.
+        // Swift String equality treats these buffers as equal, but token ranges
+        // belong to different UTF-16 offsets after the composed character.
+        view.textStorage?.replaceCharacters(in: NSRange(location: 1, length: 1), with: "e\u{301}")
+        let range = NSRange(location: 0, length: view.textStorage?.length ?? 0)
+        view.textStorage?.addAttribute(.foregroundColor, value: NSColor.systemRed, range: range)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(color(in: view, at: 0), .systemRed)
+        XCTAssertEqual(color(in: view, at: 6), .systemRed)
+        XCTAssertTrue(view.string.utf16.elementsEqual("\"e\u{301}\" true".utf16))
+    }
+
     func testAutomaticDetectionAndNamesRemainCompatible() {
         let cases: [(String, SyntaxLanguage)] = [
             ("a.json", .json), ("a.jsonc", .jsonWithComments), ("a.PY", .python),
